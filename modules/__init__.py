@@ -1,0 +1,4 @@
+from modules.news_fetcher_step1 import run_news_fetcher
+from modules.company_tagging_step2 import run_company_tagging
+from modules.longformer_step3 import run_longformer
+from modules.deberta_step4 import run_deberta

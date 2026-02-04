@@ -1,0 +1,16 @@
+[Unit]
+Description=News Sentiment Analysis Pipeline
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/News_Sentiment_Model_Step1
+ExecStart=/usr/bin/python3 /home/ubuntu/News_Sentiment_Model_Step1/main.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/ubuntu/News_Sentiment_Model_Step1/logs/news_pipeline.log
+StandardError=append:/home/ubuntu/News_Sentiment_Model_Step1/logs/news_pipeline_error.log
+
+[Install]
+WantedBy=multi-user.target

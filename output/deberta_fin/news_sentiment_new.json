@@ -1,0 +1,21 @@
+[
+    {
+        "article_id": "70591207",
+        "headline": "HCLTech to digitise Hong Kong Aero Engine Services’ MRO systems",
+        "condensed_text": "Dado Ruvic\nHong Kong Aero Engine Services Ltd (HAESL) has chosen Indian IT firm HCLTech to modernise its maintenance, repair and overhaul operations. The partnership aims to streamline HAESL's Maintenance, Repair and Overhaul (MRO) processes to boost efficiency and scalability, provide real-time data visibility for quicker decision-making, improve resource utilisation and ensure compliance with global standards. HCLTech will deploy its asset management solution, iMRO/4, as HAESL's Maintenance Execution System (MES) in Hong Kong, HCLTech said in a statement. \"By integrating iMRO/4 with SAP S/4HANA, we will enhance end -to- end traceability and provide a single view of the workflow from induction to release. \"Partnering with HCLTech marks a significant step in our transformation, creating a scalable digital foundation that supports operational excellence and long -term growth ,” said Ravinder Bedi, General Manager of Finance &amp; Administration, HAESL.",
+        "sentiment": "positive",
+        "sentiment_score": 1.0,
+        "positive_prob": 1.0,
+        "negative_prob": 0.0,
+        "neutral_prob": 0.0,
+        "confidence": 0.996,
+        "source": "The Hindu Business Line",
+        "published_time": "February 04, 2026 at 03:37 PM",
+        "url": "https://www.thehindubusinessline.com/info-tech/hcltech-to-digitise-hong-kong-aero-engine-services-mro-systems/article70591207.ece",
+        "CompanyName": "Hcl Technologies Limited",
+        "Symbol": "HCLTECH",
+        "Sector": "NIFTY IT",
+        "Index": "NIFTY 100, NIFTY 200, NIFTY 50, NIFTY 500",
+        "analyzed_at": "2026-02-04 15:52:58"
+    }
+]

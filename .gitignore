@@ -1,0 +1,51 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+
+# Output data (can be large)
+output/news_fetcher/*.json
+output/company_tagger/*.json
+output/condensed/*.json
+output/sentiment/*.json
+# Keep signals for now, but you may want to move to S3 in production
+# output/signals/*.json
+
+# OHLCV data
+data_ohlcv/
+CORRECT OHLCV TICK DATA/data_ohlcv/
+
+# Sensitive files
+dhan_token.json
+CORRECT OHLCV TICK DATA/dhan_token.json
+*.env
+.env
+
+# Model checkpoints (large files)
+models/*.bin
+models/*.safetensors
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp

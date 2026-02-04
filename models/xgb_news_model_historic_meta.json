@@ -1,0 +1,35 @@
+{
+    "model_version": "historic_v1",
+    "trained_at": "2026-02-03T05:24:04.807642",
+    "training_rows": 16343,
+    "data_source": "historic_dataset",
+    "class_distribution": {
+        "BUY": 18.37,
+        "SELL": 20.69,
+        "HOLD": 60.93
+    },
+    "validation_metrics": {
+        "accuracy": 0.7189,
+        "macro_f1": 0.5924,
+        "buy_recall": 0.3877,
+        "sell_recall": 0.3358,
+        "confusion_matrix": [
+            [
+                233,
+                37,
+                331
+            ],
+            [
+                48,
+                227,
+                401
+            ],
+            [
+                47,
+                55,
+                1890
+            ]
+        ]
+    },
+    "deployed": true
+}

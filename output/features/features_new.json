@@ -1,0 +1,27 @@
+[
+    {
+        "article_id": "70591207",
+        "symbol": "HCLTECH",
+        "company_name": "Hcl Technologies Limited",
+        "headline": "HCLTech to digitise Hong Kong Aero Engine Services’ MRO systems",
+        "sentiment": "positive",
+        "sentiment_score": 0.996,
+        "confidence": 0.996,
+        "positive_prob": 1.0,
+        "negative_prob": 0.0,
+        "neutral_prob": 0.0,
+        "news_source_score": 0.7,
+        "is_regulatory_news": 0,
+        "is_negative_event": 0,
+        "company_mention_strength": 0,
+        "time_decay_15m": 1.0,
+        "pre_news_momentum_5m": 0.2158,
+        "pre_news_momentum_30m": 0.1911,
+        "pre_news_volume_ratio": 0.0291,
+        "intraday_volatility": 1.9594,
+        "pre_news_price": 1625.0,
+        "published_time": "February 04, 2026 at 03:37 PM",
+        "source": "The Hindu Business Line",
+        "url": "https://www.thehindubusinessline.com/info-tech/hcltech-to-digitise-hong-kong-aero-engine-services-mro-systems/article70591207.ece"
+    }
+]

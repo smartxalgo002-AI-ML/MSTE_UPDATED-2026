@@ -1,0 +1,23 @@
+[
+    {
+        "article_id": "70591207",
+        "symbol": "HCLTECH",
+        "company_name": "Hcl Technologies Limited",
+        "headline": "HCLTech to digitise Hong Kong Aero Engine Services’ MRO systems",
+        "source": "The Hindu Business Line",
+        "published_time": "February 04, 2026 at 03:37 PM",
+        "condensed_text": "Dado Ruvic\nHong Kong Aero Engine Services Ltd (HAESL) has chosen Indian IT firm HCLTech to modernise its maintenance, repair and overhaul operations. The partnership aims to streamline HAESL's Maintenance, Repair and Overhaul (MRO) processes to boost efficiency and scalability, provide real-time data visibility for quicker decision-making, improve resource utilisation and ensure compliance with global standards. HCLTech will deploy its asset management solution, iMRO/4, as HAESL's Maintenance Execution System (MES) in Hong Kong, HCLTech said in a statement. \"By integrating iMRO/4 with SAP S/4HANA, we will enhance end -to- end traceability and provide a single view of the workflow from induction to release. \"Partnering with HCLTech marks a significant step in our transformation, creating a scalable digital foundation that supports operational excellence and long -term growth ,” said Ravinder Bedi, General Manager of Finance &amp; Administration, HAESL.",
+        "full_content": "Hong Kong Aero Engine Services Ltd (HAESL) has selected Indian IT firm HCLTech to modernise its maintenance, repair and overhaul operations.\nDado Ruvic\nHong Kong Aero Engine Services Ltd (HAESL) has chosen Indian IT firm HCLTech to modernise its maintenance, repair and overhaul operations.\nThe partnership aims to streamline HAESL's Maintenance, Repair and Overhaul (MRO) processes to boost efficiency and scalability, provide real-time data visibility for quicker decision-making, improve resource utilisation and ensure compliance with global standards.\nHCLTech will deploy its asset management solution, iMRO/4, as HAESL's Maintenance Execution System (MES) in Hong Kong, HCLTech said in a statement.\n\"By integrating iMRO/4 with SAP S/4HANA, we will enhance end -to- end traceability and provide a single view of the workflow from induction to release. This reduces barriers and improves execution efficiency.\n\"Partnering with HCLTech marks a significant step in our transformation, creating a scalable digital foundation that supports operational excellence and long -term growth ,” said Ravinder Bedi, General Manager of Finance &amp; Administration, HAESL.\nPublished on  February 4, 2026\nBACK TO TOP",
+        "sentiment": "positive",
+        "sentiment_score": 0.996,
+        "confidence": 0.996,
+        "predicted_signal": "HOLD",
+        "signal_confidence": 0.8782,
+        "buy_prob": 0.0408,
+        "sell_prob": 0.081,
+        "hold_prob": 0.8782,
+        "model_version": "historic_v1",
+        "url": "https://www.thehindubusinessline.com/info-tech/hcltech-to-digitise-hong-kong-aero-engine-services-mro-systems/article70591207.ece",
+        "predicted_at": "2026-02-04 15:52:59 IST"
+    }
+]

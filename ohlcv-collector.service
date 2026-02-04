@@ -1,0 +1,16 @@
+[Unit]
+Description=OHLCV Market Data Collector
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/News_Sentiment_Model_Step1/CORRECT OHLCV TICK DATA
+ExecStart=/usr/bin/python3 "/home/ubuntu/News_Sentiment_Model_Step1/CORRECT OHLCV TICK DATA/new ohlcv.py"
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/ubuntu/News_Sentiment_Model_Step1/logs/ohlcv_collector.log
+StandardError=append:/home/ubuntu/News_Sentiment_Model_Step1/logs/ohlcv_collector_error.log
+
+[Install]
+WantedBy=multi-user.target
