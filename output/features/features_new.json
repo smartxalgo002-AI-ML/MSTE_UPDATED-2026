@@ -1,12 +1,12 @@
 [
     {
-        "article_id": "70591207",
-        "symbol": "HCLTECH",
-        "company_name": "Hcl Technologies Limited",
-        "headline": "HCLTech to digitise Hong Kong Aero Engine Services’ MRO systems",
+        "article_id": "514611",
+        "symbol": "TRENT",
+        "company_name": "Trent Limited",
+        "headline": "Trent Q3 results: Net profit rises to Rs 510 crore; revenue jumps 15% to Rs 5,345 crore",
         "sentiment": "positive",
-        "sentiment_score": 0.996,
-        "confidence": 0.996,
+        "sentiment_score": 0.9989,
+        "confidence": 0.9989,
         "positive_prob": 1.0,
         "negative_prob": 0.0,
         "neutral_prob": 0.0,
@@ -15,13 +15,13 @@
         "is_negative_event": 0,
         "company_mention_strength": 0,
         "time_decay_15m": 1.0,
-        "pre_news_momentum_5m": 0.2158,
-        "pre_news_momentum_30m": 0.1911,
-        "pre_news_volume_ratio": 0.0291,
-        "intraday_volatility": 1.9594,
-        "pre_news_price": 1625.0,
-        "published_time": "February 04, 2026 at 03:37 PM",
-        "source": "The Hindu Business Line",
-        "url": "https://www.thehindubusinessline.com/info-tech/hcltech-to-digitise-hong-kong-aero-engine-services-mro-systems/article70591207.ece"
+        "pre_news_momentum_5m": -0.1586,
+        "pre_news_momentum_30m": 0.5768,
+        "pre_news_volume_ratio": 0.5044,
+        "intraday_volatility": 5.7038,
+        "pre_news_price": 4027.9,
+        "published_time": "2026-02-04 16:48:47",
+        "source": "BusinessToday",
+        "url": "https://www.businesstoday.in/markets/stocks/story/trent-q3-results-net-profit-rises-to-rs-510-crore-revenue-jumps-15-to-rs-5345-crore-514611-2026-02-04"
     }
 ]
