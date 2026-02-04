@@ -1,4 +1,5 @@
 import os
+import sys
 import csv
 import json
 import time
@@ -466,24 +467,55 @@ class DhanClient:
 # =========================
 # MAIN
 # =========================
-if __name__ == "__main__":
+def sleep_until_next_market_open():
+    """Sleep until 09:10 AM IST next trading day"""
+    now_ist = datetime.now(IST)
+    
+    # Target: Today 09:00 AM
+    target = now_ist.replace(hour=9, minute=0, second=0, microsecond=0)
+    
+    # If already past 09:00, target tomorrow 09:00
+    if now_ist > target:
+        target += timedelta(days=1)
+
+        
+    # Example logic for weekends could be added here if needed
+    # For now, just simplistic next-day logic
+    
+    wait_seconds = (target - now_ist).total_seconds()
+    hours = wait_seconds / 3600
+    print(f"[System] Sleeping for {hours:.2f} hours until {target.strftime('%Y-%m-%d %H:%M:%S')} IST...")
+    
+    # Sleep in chunks to allow CTRL+C
+    while wait_seconds > 0:
+        chunk = min(wait_seconds, 60)
+        time.sleep(chunk)
+        wait_seconds -= chunk
+        
+def run_daily_session():
+    """Run one daily session from now until market close"""
+    global stop_flag, closed_candles, candles, last_n_closes
+    
+    # Reset state
+    stop_flag = False
+    closed_candles = []
+    candles = {}
+    last_n_closes = {company: deque(maxlen=HV_WINDOW) for company in SECID_TO_COMPANY.values()}
+    
     print("Starting OHLCV capture (1-minute candles)…")
     print(f"\n{'='*60}")
     print(f"CLIENT ID DIAGNOSTICS")
     print(f"{'='*60}")
     print(f"Current Client ID: {CLIENT_ID}")
     print(f"Total instruments to subscribe: {len(SECURITY_IDS)}")
-    print(f"Instruments per connection: {MAX_PER_CONNECTION}")
-    print(f"Estimated connections needed: {(len(SECURITY_IDS) + MAX_PER_CONNECTION - 1) // MAX_PER_CONNECTION}")
     print(f"\n⚠️  If this client ID has different rate limits than your working one:")
     print(f"   - Consider reducing MAX_PER_CONNECTION (currently {MAX_PER_CONNECTION})")
-    print(f"   - Consider reducing number of concurrent connections")
-    print(f"   - Check if this client ID needs activation or has account restrictions")
     print(f"{'='*60}\n")
     websocket.enableTrace(False)
 
     ensure_dir(OUTPUT_ROOT)
 
+    # Start threads
     t_flusher = threading.Thread(target=flusher_loop, daemon=True)
     t_flusher.start()
     
@@ -509,8 +541,7 @@ if __name__ == "__main__":
         now_ist = datetime.now(IST)
         current_time = now_ist.time()
         
-        # Stop if it's past 3:31 PM IST (1 minute after market close)
-        # Using hour and minute comparison to be precise
+        # Stop if it's past 15:31 IST
         if current_time.hour > 15 or (current_time.hour == 15 and current_time.minute >= 31):
             return True
         return False
@@ -518,10 +549,10 @@ if __name__ == "__main__":
     try:
         now_ist = datetime.now(IST)
         print(f"[Info] Current time: {now_ist.strftime('%Y-%m-%d %H:%M:%S')} IST")
-        print(f"[Info] Market hours: {MARKET_OPEN_HOUR}:{MARKET_OPEN_MINUTE:02d} - {MARKET_CLOSE_HOUR}:{MARKET_CLOSE_MINUTE:02d} IST")
         print(f"[Info] Market closes at {MARKET_CLOSE_HOUR}:{MARKET_CLOSE_MINUTE:02d} IST. Script will auto-stop at 15:31 IST.")
         last_status_minute = -1
         last_stats_print = time.time()
+        
         while True:
             time.sleep(1)
             now_ist = datetime.now(IST)
@@ -531,36 +562,27 @@ if __name__ == "__main__":
             if time.time() - last_stats_print >= 30:
                 last_stats_print = time.time()
                 total_msgs = sum(c.msg_count for c in clients)
-                sub_times = [c.subscription_start_time for c in clients if c.subscription_start_time]
-                sub_status = ""
-                if sub_times:
-                    oldest_sub = min(sub_times)
-                    sub_elapsed = time.time() - oldest_sub
-                    sub_status = f", Subscription time: {sub_elapsed:.1f}s"
-                last_times = [c.last_msg_time for c in clients if c.last_msg_time]
-                print(f"[Stats] Clients: {len(clients)}, Messages: {total_msgs}, Decoded: {decode_stats['processed']}, Errors: {decode_stats['errors']}, "
-                      f"Candles in memory: {len(candles)}, Closed pending: {len(closed_candles)}{sub_status}")
-                if last_times:
-                    latest = max(last_times)
-                    elapsed = (datetime.now(IST) - latest).total_seconds()
-                    print(f"[Stats] Last message: {elapsed:.1f} seconds ago")
+                print(f"[Stats] Clients: {len(clients)}, Messages: {total_msgs}, Decoded: {decode_stats['processed']}, "
+                      f"Candles in memory: {len(candles)}, Closed pending: {len(closed_candles)}")
             
-            # Print status every minute to show it's checking
+            # Print status every minute near close
             if current_minute != last_status_minute and now_ist.hour >= 15:
                 if now_ist.hour == 15 and current_minute == 30:
-                    print(f"[Status] Market closing at 15:30 IST. Will auto-stop at 15:31 IST...")
+                    print(f"[Status] Market closing at 15:30 IST. Will stop soon...")
                 last_status_minute = current_minute
             
-            # Check if market is closed (after 3:31 PM IST)
+            # Check if market is closed
             if check_market_close():
                 print(f"[Market Close] Market closed. Stopping data collection at {now_ist.strftime('%H:%M:%S')} IST...")
                 break
+                
     except KeyboardInterrupt:
-        print("Shutting down...")
+        print("KeyboardInterrupt detected. Stopping session...")
+        raise  # Propagate to main loop to exit completely
+        
     finally:
-        print("Shutting down...")
+        print("Stopping threads...")
         stop_flag = True
-        print("Flushing remaining candles...")
         for c in clients:
             c.stop()
         for t in threads:
@@ -570,5 +592,37 @@ if __name__ == "__main__":
                 write_ohlcv(c)
             for _, candle in candles.items():
                 write_ohlcv(candle)
-        print("Shutdown complete.")
+        print("Session End: Cleanup complete.")
+
+# =========================
+# MAIN LOOP (Runs Forever)
+# =========================
+if __name__ == "__main__":
+    try:
+        while True:
+            # 1. Run the daily trading session
+            run_daily_session()
+            
+            # 2. After session ends (at 15:31), go to sleep until next morning
+            print("\n" + "="*60)
+            print("MARKET CLOSED FOR TODAY")
+            print("System will now sleep until next market open (09:00 AM IST)")
+            print("="*60 + "\n")
+            
+            sleep_until_next_market_open()
+            
+            # 3. Updates token before starting next session (if needed)
+            # TokenManager handles renewal automatically inside get_valid_token logic
+            # but we can force refresh if we wanted to. Current logic re-reads on init.
+            print("Waking up! Preparing for new trading session...")
+            
+    except KeyboardInterrupt:
+        print("\n[System] Permanently stopped by user (CTRL+C). Goodbye!")
+        sys.exit(0)
+    except Exception as e:
+        print(f"\n[System] CRITICAL ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        print("Restarting loop in 60 seconds...")
+        time.sleep(60)
 
