@@ -29,21 +29,22 @@ def load_data(source_type="all"):
         df['full_content'] = df.get('full_content', df['condensed_text'])
         
         # Parse published_time which has format: "12:11 PM | 04 Feb 2026"
+        # Parse published_time which has multiple formats
         def parse_custom_time(time_str):
             try:
                 time_str = str(time_str).strip()
-                # Handle the custom format "HH:MM AM/PM | DD Mon YYYY"
+                # 1. Handle Pipe format: "12:11 PM | 04 Feb 2026"
                 if '|' in time_str:
                     time_part, date_part = time_str.split('|')
-                    time_part = time_part.strip()
-                    date_part = date_part.strip()
-                    # Combine and parse: "04 Feb 2026 12:11 PM"
-                    combined = f"{date_part} {time_part}"
+                    combined = f"{date_part.strip()} {time_part.strip()}"
                     return pd.to_datetime(combined, format='%d %b %Y %I:%M %p', errors='coerce')
-                # Fallback to standard parsing for predicted_at format
-                else:
-                    time_str = time_str.replace(' IST', '').replace('T', ' ')
-                    return pd.to_datetime(time_str, errors='coerce')
+                
+                # 2. Handle "February 05, 2026 at 10:53 AM" (The Hindu Business Line)
+                if ' at ' in time_str:
+                    return pd.to_datetime(time_str, format='%B %d, %Y at %I:%M %p', errors='coerce')
+                
+                # 3. Handle specific ISO-like format: "2026-02-05 10:55:07"
+                return pd.to_datetime(time_str, errors='coerce')
             except:
                 return pd.NaT
         
@@ -51,9 +52,15 @@ def load_data(source_type="all"):
         time_source = df.get('published_time', df['predicted_at'])
         df['timestamp'] = time_source.apply(parse_custom_time)
         
+        # Fill NaNs in timestamp with predicted_at if the main parser failed
+        mask_nat = df['timestamp'].isna()
+        if mask_nat.any():
+             # Try parsing predicted_at as fallback for failed ones
+             df.loc[mask_nat, 'timestamp'] = pd.to_datetime(df.loc[mask_nat, 'predicted_at'].astype(str).str.replace(' IST', '').str.replace('T', ' '), errors='coerce')
+
         df['date'] = df['timestamp'].dt.date
-        df['formatted_date'] = df['timestamp'].dt.strftime('%d %b %Y')
-        df['time'] = df['timestamp'].dt.strftime('%H:%M')
+        df['formatted_date'] = df['timestamp'].dt.strftime('%d %b %Y').fillna("Date N/A")
+        df['time'] = df['timestamp'].dt.strftime('%H:%M').fillna("--:--")
         df['sentiment_label'] = df['sentiment'].str.upper()
         df['signal_prediction'] = df['predicted_signal']
         df['signal_confidence'] = df['signal_confidence'] * 100
@@ -80,7 +87,20 @@ if "selected_article_id" not in st.session_state:
 
 # Sidebar
 with st.sidebar:
-    st.title("📊 SignalNews")
+    # Custom Styled Sidebar Title
+    st.markdown("""
+        <div style="
+            text-align: left;
+            font-size: 2rem;
+            font-weight: 800;
+            color: #ffffff;
+            text-transform: uppercase;
+            text-shadow: 0 0 5px rgba(0, 210, 255, 0.4);
+            margin-bottom: 20px;
+        ">
+        📊 SignalNews
+        </div>
+    """, unsafe_allow_html=True)
     
     if st.button("⏱️ Recent (New Batch)", key="btn_recent", use_container_width=True):
         st.session_state.active_tab = "recent"
@@ -103,7 +123,7 @@ with st.sidebar:
 # Filter Data based on Active Tab
 if st.session_state.active_tab == "recent":
     df = st.session_state.data_new
-    page_title = "Recent Signals (Latest Batch)"
+    page_title = "RECENT SIGNALS (LATEST BATCH)"
     
 elif st.session_state.active_tab == "previous":
     full_df = st.session_state.data_all
@@ -112,16 +132,102 @@ elif st.session_state.active_tab == "previous":
         df = full_df[full_df['date'] == today]
     else:
         df = pd.DataFrame()
-    page_title = "Today's Signals"
+    page_title = "TODAY'S SIGNALS"
 
 else:  # historic
     df = st.session_state.data_all
-    page_title = "Historic Signals"
+    page_title = "HISTORIC SIGNALS"
 
 
 def show_list_view():
-    st.header(page_title)
+    st.markdown(f"## **{page_title}**")
     st.caption(f"Showing {len(df)} articles")
+    
+    import base64
+    def get_base64_of_bin_file(bin_file):
+        with open(bin_file, 'rb') as f:
+            data = f.read()
+        return base64.b64encode(data).decode()
+
+    # Background Image CSS (Refined: Blurred & Darkened)
+    try:
+        bin_str = get_base64_of_bin_file("trading_bg.png")
+        page_bg_img = '''
+        <style>
+        /* Container for the background */
+        [data-testid="stAppViewContainer"] > .main {
+            background-color: transparent;
+        }
+        
+        /* The Background Image Element */
+        .stApp {
+            background: transparent;
+        }
+        
+        .stApp::before {
+            content: "";
+            position: fixed;
+            top: 0; 
+            left: 0;
+            width: 100vw; 
+            height: 100vh;
+            background-image: url("data:image/png;base64,%s");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            
+            filter: blur(4px) brightness(0.35) contrast(1.1); 
+            z-index: -1;
+        }
+        </style>
+        ''' % bin_str
+        st.markdown(page_bg_img, unsafe_allow_html=True)
+    except Exception as e:
+        pass
+
+    # Custom CSS for Hover Effect (Headlines Only + Sidebar)
+    st.markdown("""
+        <style>
+        /* Target ONLY buttons in the main area (Headlines) */
+        section[data-testid="stMain"] div.stButton button {
+            border: 1px solid #444; /* Default subtle border */
+            transition: all 0.3s ease-in-out;
+            border-radius: 8px;
+            background-color: rgba(20, 20, 30, 0.8); /* Semi-transparent button bg */
+        }
+
+        /* Hover State for Headlines - Cyan */
+        section[data-testid="stMain"] div.stButton button:hover {
+            border: 1px solid #00d2ff !important;
+            background-color: rgba(0, 210, 255, 0.15) !important;
+            box-shadow: 0 0 15px rgba(0, 210, 255, 0.4);
+            color: #00d2ff !important;
+            transform: scale(1.01);
+        }
+        
+        /* ---------------------------------------------------- */
+        /* Sidebar Buttons - Yellow Hover Effect "In Sides" */
+        /* ---------------------------------------------------- */
+        section[data-testid="stSidebar"] div.stButton button {
+            border: 1px solid #444;
+            transition: all 0.3s ease-in-out;
+            background-color: rgba(30,30,30,0.8);
+        }
+        
+        section[data-testid="stSidebar"] div.stButton button:hover {
+            border: 1px solid #FFD700 !important; /* Gold/Yellow Border */
+            color: #FFD700 !important;
+            background-color: rgba(255, 215, 0, 0.15) !important; /* Faint yellow tint */
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.4); /* Yellow glow */
+        }
+
+        /* Ensure the container doesn't block the effect */
+        [data-testid="stHorizontalBlock"] {
+            border: none;
+            background-color: transparent;
+        }
+        </style>
+    """, unsafe_allow_html=True)
     
     for index, row in df.iterrows():
         col1, col2, col3, col4, col5 = st.columns([0.3, 1, 1, 5, 1])
@@ -147,7 +253,7 @@ def show_list_view():
             else:  # HOLD
                 st.warning(f"→ {signal}")
         
-        st.divider()
+        st.write("") # Spacing instead of divider
 
 
 def show_detail_view():
@@ -172,13 +278,27 @@ def show_detail_view():
             st.write(f"**{formatted_date.upper()}**")
         else:
             st.write("**DATE N/A**")
-        st.caption(f"{article.get('time', '')} IST")
+        st.write(f"**{article.get('time', '')} IST**")
     
     st.divider()
-    
-    # Show Full Content
-    content_to_show = article.get('full_content') or article.get('condensed_text', 'No content available.')
-    st.write(content_to_show)
+
+    # Content with INLINE CSS to ensure it renders correctly
+    content_html = f"""
+    <div style="
+        background-color: rgba(10, 10, 15, 0.85);
+        padding: 30px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        color: #e0e0e0;
+        font-size: 1.1rem;
+        line-height: 1.6;
+        margin-top: 20px;
+    ">
+        {article['full_content'].replace(chr(10), '<br><br>')}
+    </div>
+    """
+    st.markdown(content_html, unsafe_allow_html=True)
     
     # URL Link
     if article.get('url'):

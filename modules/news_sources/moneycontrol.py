@@ -96,17 +96,34 @@ def fetch_full_article(url):
                 return article_text, published_time
 
         possible_selectors = [
-            'div.article_wrapper', 'div.content_wrapper', 'div.arttextxml', 'div.article_content',
-            'div#article-main', 'div.content', 'div.maincontent', 'div.article_content_new',
-            'div.clearfix', 'article',
+            'div#contentdata',          # Most common in new layout
+            'div.content_wrapper', 
+            'div.arti-flow',            # Another common wrapper
+            'div#article-main', 
+            'div.article_content',
+            'div.arttextxml', 
+            'div.maincontent', 
+            'div.article_content_new',
+            'div.clearfix', 
+            'article',
         ]
         article_text = ""
         for selector in possible_selectors:
             container = soup.select_one(selector)
             if container:
+                # Remove junk elements before extracting text
+                for junk in container.select('.arttidate, .article_schedule, .social_icons, .tags_first_line, .inv_social'):
+                    junk.decompose()
+                    
                 paragraphs = container.find_all("p")
-                article_text = "\n".join(p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True))
-                if len(article_text) > 100:
+                text_content = "\n".join(p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True))
+                
+                # Check for junk content
+                if "My Account" in text_content[:50] or "Follow us on" in text_content[:50]:
+                    continue
+                    
+                if len(text_content) > 100:
+                    article_text = text_content
                     break
 
         if not article_text:

@@ -94,6 +94,8 @@ LIVEMINT_BOILERPLATE_REGEXES = [
     r"(?i)^\W*read\s+premium\s+stories.*$",
     r"(?i)^\W*log\s*in\s+to\s+our\s+website\s+to\s+save\s+your\s+bookmarks.*$",
     r"(?i)^\W*it'?ll\s+just\s+take\s+a\s+moment\.?$",
+    r"(?i)^.*?exceeded\s+the\s+limit\s+to\s+bookmark\s+the\s+image.*$",
+    r"(?i)^.*?remove\s+some\s+to\s+bookmark\s+this\s+image.*$",
 ]
 
 def _strip_lines_by_regexes(text: str, regex_list) -> str:

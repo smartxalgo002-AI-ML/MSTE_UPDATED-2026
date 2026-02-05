@@ -600,7 +600,19 @@ def run_daily_session():
 if __name__ == "__main__":
     try:
         while True:
-            # 1. Run the daily trading session
+            # 1. Update Token (Auto-Renew if needed) before session starts
+            print("\n[System] Checking Token Validity...")
+            ACCESS_TOKEN, CLIENT_ID = token_manager.get_valid_token()
+            
+            if not ACCESS_TOKEN:
+                print("[System] ❌ Failed to get valid token. Retrying in 60s...")
+                time.sleep(60)
+                continue
+                
+            # Update global variables so run_daily_session uses the new token/client
+            WS_URL = f"wss://api-feed.dhan.co?version=2&token={ACCESS_TOKEN}&clientId={CLIENT_ID}&authType=2"
+            
+            # 2. Run the daily trading session
             run_daily_session()
             
             # 2. After session ends (at 15:31), go to sleep until next morning

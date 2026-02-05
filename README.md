@@ -90,130 +90,89 @@ This project automatically:
 
 ---
 
-## How to Run
+## 🚀 How to Run (One-Click)
 
-### 1. Setup Environment
-```bash
-# Create virtual environment
-python -m venv .venv
+The project includes automated scripts for Windows and Linux/Mac.
 
-# Activate it (Windows)
-.venv\Scripts\activate
+### 1. Start the Entire System
+This single command launches:
+- **News Pipeline** (Scrapes news & runs AI models)
+- **OHLCV Collector** (Fetches market data 24/7)
+- **Auto-Sleep System** (Sleeps at 15:31, restarts at 09:00 AM)
 
-# Install dependencies
-pip install -r requirements.txt
+**Windows:**
+```powershell
+.\start.bat
 ```
 
-### 2. Run the Pipeline
-
-**Run once:**
+**Linux / Mac:**
 ```bash
-python main.py --once
+./start.sh
 ```
 
-**Run continuously (every 5 minutes):**
+### 2. Run the Dashboard
+Opens the Streamlit dashboard to visualize signals and data.
+
+**Windows:**
+```powershell
+.\run_dashboard.bat
+```
+
+**Linux / Mac:**
 ```bash
-python main.py
+./run_dashboard.sh
 ```
 
 ---
 
-## Project Structure
+## 🛠️ Deployment & Cloud
+This project is **Cloud-Ready** (AWS/GCP/Azure).
+- See [AWS Deployment Guide](aws_deployment_guide.md) for full server setup.
+- Includes `systemd` service files for auto-restart on Linux servers.
+
+---
+
+## 📂 Project Structure
 
 ```
 News_Sentiment_Model_Step1/
-├── main.py                    # Main entry point (runs all 4 steps)
+├── start.bat / .sh            # 🚀 MASTER START SCRIPT
+├── run_dashboard.bat / .sh    # 📊 DASHBOARD SCRIPT
+├── main.py                    # Main entry point (News Pipeline)
 ├── config.py                  # All file paths and settings
-├── requirements.txt           # Python dependencies
+├── aws_deployment_guide.md    # Deployment instructions
 │
-├── modules/
-│   ├── news_fetcher_step1.py      # Step 1: Fetches news
-│   ├── company_tagging_step2.py   # Step 2: Tags companies
-│   ├── longformer_step3.py        # Step 3: Summarizes articles
-│   ├── deberta_step4.py           # Step 4: Sentiment analysis
-│   ├── feature_builder_step5.py   # Step 5: Feature extraction
-│   ├── ohlcv_merge_step6.py       # Step 6: Market data merge
-│   ├── label_generator_step7.py   # Step 7: Training labels
-│   ├── xgboost_trainer_step8.py   # Step 8: Model training
-│   ├── signal_predictor_step9.py  # Step 9: ML predictions
-│   │
-│   └── news_sources/              # Individual scrapers
-│       ├── moneycontrol.py
-│       ├── livemint.py
-│       ├── the_economic_times.py
-│       ├── cnbc_tv18.py
-│       ├── business_today.py
-│       └── hindu_business_Line.py
+├── modules/                   # AI & Processing Modules
+│   ├── news_fetcher_step1.py
+│   ├── company_tagging_step2.py
+│   ├── longformer_step3.py
+│   ├── deberta_step4.py
+│   ├── feature_builder_step5.py
+│   ├── ohlcv_merge_step6.py
+│   ├── label_generator_step7.py
+│   ├── xgboost_trainer_step8.py
+│   └── signal_predictor_step9.py
 │
-├── mapping/
-│   └── companywise_keyword_mapping.csv.csv  # Company → Keywords mapping
+├── CORRECT OHLCV TICK DATA/   # 📈 Market Data Engine
+│   ├── new ohlcv.py           # The 24/7 Collector Script
+│   └── token_manager.py       # Auto-renews Dhan tokens
 │
-├── output/                    # All output files saved here
-│   ├── news_fetcher/
-│   ├── company_tagger/
-│   ├── longformer/
-│   ├── deberta_fin/
-│   ├── features/
-│   ├── ohlcv_merger/
-│   ├── labels/
-│   └── signals/              # ML trading signals
+├── Dashboard_mste/            # Streamlit Dashboard
+│   └── app.py
 │
-├── models/                   # Trained XGBoost models
-│   └── xgb_news_model_latest.pkl
-│
-└── logs/                      # Log files
+├── output/                    # All Generated Data (JSONs)
+├── models/                    # Trained Models (.pkl)
+└── logs/                      # System Logs
 ```
 
 ---
 
-## Configuration
-
-Edit `config.py` to change:
-- `MAX_ARTICLES` – How many articles to fetch per source (default: 30)
-- Output file paths
-- Mapping file paths
+## ⚙️ Configuration
+- **`config.py`**: Main path settings.
+- **`CORRECT OHLCV TICK DATA/new ohlcv.py`**: Collection schedule (09:00 - 15:31).
+- **`dhan_token.json`**: Token storage (auto-renews).
 
 ---
-
-## Requirements
-
-- Python 3.10+
-- GPU recommended for faster model inference (Longformer & DeBERTa)
-- Internet connection for scraping news
-
----
-
-## Notes
-
-- The pipeline skips already-processed articles (no duplicates)
-- Each run only processes NEW articles
-- All cumulative data is preserved in `all_*.json` files
-- Use `--once` flag for single run, otherwise it loops every 5 minutes
-
-Hp@LAPTOP-L204T18A MINGW64 /d/Final_MSTE_Long_Debert
-$ cd News_Sentiment_Model_Step1
-
-Hp@LAPTOP-L204T18A MINGW64 /d/Final_MSTE_Long_Debert/News_Sentiment_Model_Step1
-$ python -m venv .venv
-source .venv/Scripts/activate
-(.venv) 
-Hp@LAPTOP-L204T18A MINGW64 /d/Final_MSTE_Long_Debert/News_Sentiment_Model_Step1
-$ pip install -r requirements.txt
-
-Hp@LAPTOP-L204T18A MINGW64 /d/Final_MSTE_Long_Debert/News_Sentiment_Model_Step1
-$ python main.py
-🔁 Starting News Sentiment Pipeline (loop mode)
-   Interval: 5 minutes
-   Press CTRL+C to stop.
-
-   to run ohlcv fetcher:
-   cd "d:\Final_MSTE_Long_Debert\News_Sentiment_Model_Step1\CORRECT OHLCV TICK DATA"
-python "new ohlcv.py"
-
-to run the track accuracy script:
-
-cd "d:\Final_MSTE_Long_Debert\News_Sentiment_Model_Step1"
-python "track_live_accuracy.py"
-
-to run mste dashboard
-"d:\Final_MSTE_Long_Debert\News_Sentiment_Model_Step1\Dashboard_mste\run_dashboard_standalone.bat"
+## ⚠️ Notes
+- The **OHLCV Collector** is designed to run **24/7**. It automatically sleeps after market close (15:30) and wakes up the next morning (09:00).
+- **Do not close the terminal** running `start.bat` if you want continuous data collection.
