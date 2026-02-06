@@ -12,7 +12,8 @@ This project automatically:
 3. **Condenses long articles** into short, focused text
 4. **Analyzes sentiment** (Positive / Neutral / Negative) for each company
 5. **Extracts market features** (price momentum, volume, volatility) for context
-6. **Generates ML-based trading signals** (BUY / SELL / HOLD) using XGBoost with 15 features
+6. **Generates ML-based trading signals** (BUY / SELL / HOLD) using XGBoost
+7. **Overnight Intelligence**: Buffers news during off-hours, providing sentiment-based "BULLISH/BEARISH" bias on the dashboard until market open.
 
 ---
 
@@ -65,9 +66,9 @@ This project automatically:
 - Automatically improves over time with more data
 
 ### Step 9: Signal Predictor
-- Uses trained XGBoost model to predict BUY/SELL/HOLD signals
-- Generates confidence scores and probabilities
-- Provides actionable trading signals for new articles
+- **Daylight Mode**: Uses trained XGBoost model with live market data for BUY/SELL/HOLD.
+- **Overnight Mode**: Buffers incoming news in `overnight_buffer.json` and shows sentiment bias (BULLISH/BEARISH/NEUTRAL) on the dashboard via `overnight_signal.json`.
+- **9:30 AM Trigger**: Automatically combines overnight news with fresh market ticks for real predictions at open.
 
 ---
 
@@ -86,6 +87,8 @@ This project automatically:
 | `output/ohlcv_merger/` | `all_ohlcv_merger.json` | Articles with market data |
 | `output/labels/` | `all_labeled_news.json` | Training labels (BUY/SELL/HOLD) |
 | `output/signals/` | `all_signals.json` | **ML predictions (trading signals)** |
+| `output/signals/` | `overnight_buffer.json`| Buffered features waiting for 9:30 AM |
+| `output/signals/` | `overnight_signal.json`| **Sentiment bias displayed at night** |
 | `models/` | `xgb_news_model_latest.pkl` | Trained XGBoost model |
 
 ---
@@ -168,9 +171,10 @@ News_Sentiment_Model_Step1/
 ---
 
 ## ⚙️ Configuration
-- **`config.py`**: Main path settings.
+- **`config.py`**: Main path settings and module configuration.
 - **`CORRECT OHLCV TICK DATA/new ohlcv.py`**: Collection schedule (09:00 - 15:31).
-- **`dhan_token.json`**: Token storage (auto-renews).
+- **`dhan_token.json`**: Token storage (auto-renews via `token_manager.py`).
+- **`fix_token.py`**: Utility to manually synchronize/fix token metadata.
 
 ---
 ## ⚠️ Notes
