@@ -6,8 +6,23 @@ from datetime import datetime
 
 # Helper to load data
 def load_data(source_type="all"):
+    
+    # Check for overnight signals first (if in Recent/Overnight tab)
     if source_type == "new":
-        path = os.path.join("..", "output", "signals", "signals_new.json")
+        overnight_path = os.path.join("..", "output", "signals", "overnight_signal.json")
+        new_path = os.path.join("..", "output", "signals", "signals_new.json")
+        
+        # If overnight file exists and is newer than signals_new, use it
+        if os.path.exists(overnight_path) and os.path.getsize(overnight_path) > 5:
+            if not os.path.exists(new_path) or os.path.getmtime(overnight_path) > os.path.getmtime(new_path):
+                path = overnight_path
+                st.session_state["is_overnight"] = True
+            else:
+                path = new_path
+                st.session_state["is_overnight"] = False
+        else:
+            path = new_path
+            st.session_state["is_overnight"] = False
     else:
         path = os.path.join("..", "output", "signals", "all_signals.json")
 
@@ -64,6 +79,12 @@ def load_data(source_type="all"):
         df['sentiment_label'] = df['sentiment'].str.upper()
         df['signal_prediction'] = df['predicted_signal']
         df['signal_confidence'] = df['signal_confidence'] * 100
+        
+        # Handle overnight specific display logic
+        if st.session_state.get("is_overnight", False) and source_type == "new":
+             df['signal_prediction'] = "OVERNIGHT"
+             df['signal_confidence'] = 0.0
+
         df = df.sort_values('timestamp', ascending=False)
         
         # Deduplicate to prevent Streamlit key errors
@@ -82,6 +103,8 @@ if "view" not in st.session_state:
     st.session_state.view = "list"
 if "selected_article_id" not in st.session_state:
     st.session_state.selected_article_id = None
+if "is_overnight" not in st.session_state:
+    st.session_state.is_overnight = False
 
 # ... (view state init)
 
@@ -123,7 +146,11 @@ with st.sidebar:
 # Filter Data based on Active Tab
 if st.session_state.active_tab == "recent":
     df = st.session_state.data_new
-    page_title = "RECENT SIGNALS (LATEST BATCH)"
+    if st.session_state.get("is_overnight", False):
+        page_title = "🌙 OVERNIGHT NEWS (MARKET CLOSED)"
+        st.info("ℹ️ Market Closed: Showing overnight news sentiment bias. Trade signals will generate at 9:30 AM.")
+    else:
+        page_title = "RECENT SIGNALS (LATEST BATCH)"
     
 elif st.session_state.active_tab == "previous":
     full_df = st.session_state.data_all

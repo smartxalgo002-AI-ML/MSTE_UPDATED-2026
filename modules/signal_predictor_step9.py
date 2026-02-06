@@ -221,15 +221,129 @@ def run_signal_predictor(signals_new_path=None, signals_all_path=None):
     if not os.path.exists(OHLCV_MERGER_NEW_PATH):
         log(f"⚠️ No enriched feature data found at {OHLCV_MERGER_NEW_PATH}")
         return []
-    
+
     features = load_json(OHLCV_MERGER_NEW_PATH)
     
     if not features:
-        log("⚠️ No features to predict on")
-        return []
-    
+        log(f"⚠️ No features to predict on")
+        
     log(f"📊 Loaded {len(features)} feature vectors")
     
+    # ==================================================
+    # OVERNIGHT LOGIC
+    # ==================================================
+    
+    # Import overnight paths
+    from config import OVERNIGHT_BUFFER_PATH, OVERNIGHT_SIGNAL_PATH
+
+    def is_market_open():
+        """
+        Check if market is open (09:30 - 15:30 IST).
+        Note: We start at 09:30 to allow 15 mins of fresh data accumulation (09:15-09:30).
+        """
+        now_utc = datetime.now(timezone.utc)
+        now_ist = now_utc + timedelta(hours=5, minutes=30)
+        current_time = now_ist.time()
+        
+        # Market hours: 09:30 to 15:30
+        start_time = datetime.strptime("09:30", "%H:%M").time()
+        end_time = datetime.strptime("15:30", "%H:%M").time()
+        
+        is_open = start_time <= current_time <= end_time
+        
+        log(f"🕒 Current Time (IST): {current_time.strftime('%H:%M:%S')} | Market Open: {is_open}")
+        return is_open
+
+    market_is_active = is_market_open()
+
+    # Load previously buffered overnight news if market is now open
+    buffered_features = []
+    if market_is_active and os.path.exists(OVERNIGHT_BUFFER_PATH):
+        buffered_features = load_json(OVERNIGHT_BUFFER_PATH)
+        if buffered_features:
+            log(f"🌅 Market OPEN: Processing {len(buffered_features)} buffered overnight items")
+            # Clear the buffer file immediately to avoid double processing if crash happens later (safeguard)
+            save_json(OVERNIGHT_BUFFER_PATH, [])
+            
+            # Also clear the overnight signal display file
+            if os.path.exists(OVERNIGHT_SIGNAL_PATH):
+                save_json(OVERNIGHT_SIGNAL_PATH, [])
+                log("🧹 Cleared overnight_signal.json")
+
+    # If market is closed, we buffer incoming features instead of predicting
+    if not market_is_active:
+        log("🌙 Market CLOSED (Overnight Mode)")
+        
+        if features:
+            # 1. Buffer the features
+            append_to_all(OVERNIGHT_BUFFER_PATH, features)
+            log(f"📥 Buffered {len(features)} items for morning processing")
+            
+            # 2. Generate simplified "Overnight Signals" (No XGBoost, just Sentiment)
+            overnight_signals = []
+            
+            # Load sentiment/raw data map for enrichment
+            sentiment_data = load_json(SENTIMENT_NEW_PATH)
+            sentiment_map = {s.get("article_id"): s for s in sentiment_data}
+            raw_news_data = load_json(RECENT_MERGED_PATH)
+            raw_news_map = {str(n.get("article_id")): n for n in raw_news_data}
+            
+            for feature_row in features:
+                article_id = str(feature_row.get("article_id"))
+                
+                # Get metadata
+                original_article = sentiment_map.get(article_id, {})
+                raw_article = raw_news_map.get(article_id, {})
+                
+                # Create simplified signal object
+                overnight_sig = {
+                    "article_id": article_id,
+                    "symbol": feature_row.get("symbol"),
+                    "headline": original_article.get("headline", feature_row.get("headline")),
+                    "source": original_article.get("source", raw_article.get("source", "Unknown")),
+                    "published_time": feature_row.get("published_time"),
+                    "full_content": raw_article.get("content", original_article.get("condensed_text", "")),
+                    "sentiment": feature_row.get("sentiment"),
+                    "sentiment_score": feature_row.get("sentiment_score"),
+                    "confidence": feature_row.get("confidence"),
+                    
+                    # Placeholder values for compatibility
+                    "predicted_signal": "HOLD",  # Default to Neutral/Hold overnight
+                    "signal_confidence": 0.0,
+                    "buy_prob": 0.0,
+                    "sell_prob": 0.0,
+                    "hold_prob": 1.0, 
+                    "model_version": "overnight_bias",
+                    "url": raw_article.get("url", ""),
+                    "predicted_at": (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).strftime("%Y-%m-%d %H:%M:%S IST"),
+                    "is_overnight": True
+                }
+                overnight_signals.append(overnight_sig)
+            
+            # Append to overnight display file (cumulative for the night)
+            append_to_all(OVERNIGHT_SIGNAL_PATH, overnight_signals)
+            log(f"💾 Updated {OVERNIGHT_SIGNAL_PATH} with {len(overnight_signals)} overnight items")
+            
+        return []
+
+    # ==================================================
+    # MARKET OPEN EXECUTION (Process Current + Buffered)
+    # ==================================================
+
+    # Merge buffered features with current features
+    # Note: Buffered features have "stale" market data from when they were fetched.
+    # In a perfect V2 implementation, we would re-fetch fresh OHLCV for them here.
+    # For now, we process them with the XGBoost model which (as requested) 
+    # will now run since it is > 9:30 AM.
+    
+    combined_features = buffered_features + features
+    
+    if not combined_features:
+        log("⚠️ No features to predict on (Current or Buffered)")
+        return []
+        
+    log(f"📊 Processing {len(combined_features)} items ({len(buffered_features)} buffered + {len(features)} new)")
+
     # Also load sentiment data to enrich predictions with original article info
     sentiment_data = load_json(SENTIMENT_NEW_PATH)
     sentiment_map = {s.get("article_id"): s for s in sentiment_data}
@@ -263,7 +377,8 @@ def run_signal_predictor(signals_new_path=None, signals_all_path=None):
     # Generate predictions
     predictions = []
     
-    for feature_row in features:
+    # Iterate over COMBINED features
+    for feature_row in combined_features:
         article_id = str(feature_row.get("article_id"))
         
         # Extract feature vector

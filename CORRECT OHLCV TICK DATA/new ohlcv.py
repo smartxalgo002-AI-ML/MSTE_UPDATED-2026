@@ -16,7 +16,11 @@ from token_manager import TokenManager
 # CONFIGURATION
 # =========================
 # Initialize token manager
-token_manager = TokenManager("dhan_token.json")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TOKEN_PATH = os.path.join(BASE_DIR, "dhan_token.json")
+
+token_manager = TokenManager(TOKEN_PATH)
+
 ACCESS_TOKEN, CLIENT_ID = token_manager.get_valid_token()
 
 if not ACCESS_TOKEN or not CLIENT_ID:
@@ -32,7 +36,7 @@ print(f"[Config] WebSocket URL: wss://api-feed.dhan.co?version=2&token=***&clien
 
 
 OUTPUT_ROOT = os.path.join(os.getenv("TICKS_BASE_DIR", "data_ohlcv"), "group_XX")
-CSV_PATH = "mapping_security_ids.csv"
+CSV_PATH = os.path.join(BASE_DIR, "mapping_security_ids.csv")
 PRINT_TICKS = True
 
 HV_WINDOW = 60  # number of past candles to calculate HV
@@ -637,4 +641,3 @@ if __name__ == "__main__":
         traceback.print_exc()
         print("Restarting loop in 60 seconds...")
         time.sleep(60)
-
