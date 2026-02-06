@@ -41,7 +41,7 @@ def load_data(source_type="all"):
         df['title'] = df['headline']
         df['author'] = df.get('source', 'Unknown Source')
         # Use the new full_content field, fallback to condensed_text
-        df['full_content'] = df.get('full_content', df['condensed_text'])
+        df['full_content'] = df.get('full_content', df.get('condensed_text', ""))
         
         # Parse published_time which has format: "12:11 PM | 04 Feb 2026"
         # Parse published_time which has multiple formats
@@ -64,7 +64,7 @@ def load_data(source_type="all"):
                 return pd.NaT
         
         # Use published_time for display, fallback to predicted_at if necessary
-        time_source = df.get('published_time', df['predicted_at'])
+        time_source = df.get('published_time', df.get('predicted_at', pd.Series([datetime.now().strftime("%Y-%m-%d %H:%M:%S IST")] * len(df))))
         df['timestamp'] = time_source.apply(parse_custom_time)
         
         # Fill NaNs in timestamp with predicted_at if the main parser failed
@@ -77,13 +77,14 @@ def load_data(source_type="all"):
         df['formatted_date'] = df['timestamp'].dt.strftime('%d %b %Y').fillna("Date N/A")
         df['time'] = df['timestamp'].dt.strftime('%H:%M').fillna("--:--")
         df['sentiment_label'] = df['sentiment'].str.upper()
-        df['signal_prediction'] = df['predicted_signal']
-        df['signal_confidence'] = df['signal_confidence'] * 100
+        df['signal_prediction'] = df.get('predicted_signal', "HOLD")
+        df['signal_confidence'] = df.get('signal_confidence', 0.0) * 100
         
-        # Handle overnight specific display logic
+        # Handle overnight specific display logic (now showing sentiment bias)
         if st.session_state.get("is_overnight", False) and source_type == "new":
-             df['signal_prediction'] = "OVERNIGHT"
-             df['signal_confidence'] = 0.0
+             # We preserve the predicted_signal (BULLISH/BEARISH/NEUTRAL) 
+             # and the confidence now that we have real bias values
+             pass
 
         df = df.sort_values('timestamp', ascending=False)
         
@@ -369,9 +370,9 @@ def show_detail_view():
             st.write("**Predicted Signal**")
         with scol2:
             # Color based on signal
-            if article['signal_prediction'] == "BUY":
+            if article['signal_prediction'] in ["BUY", "BULLISH"]:
                 st.success(f"↗ {article['signal_prediction']}")
-            elif article['signal_prediction'] == "SELL":
+            elif article['signal_prediction'] in ["SELL", "BEARISH"]:
                 st.error(f"↘ {article['signal_prediction']}")
             else:
                 st.warning(f"→ {article['signal_prediction']}")

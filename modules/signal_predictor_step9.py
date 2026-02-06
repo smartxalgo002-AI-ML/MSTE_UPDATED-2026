@@ -295,7 +295,17 @@ def run_signal_predictor(signals_new_path=None, signals_all_path=None):
                 original_article = sentiment_map.get(article_id, {})
                 raw_article = raw_news_map.get(article_id, {})
                 
-                # Create simplified signal object
+                # Create simplified signal object with sentiment-based bias instead of generic "HOLD"
+                sentiment = feature_row.get("sentiment", "Neutral")
+                confidence = feature_row.get("confidence", 0.0)
+                
+                if sentiment == "Positive":
+                    pred_sig = "BULLISH"
+                elif sentiment == "Negative":
+                    pred_sig = "BEARISH"
+                else:
+                    pred_sig = "NEUTRAL"
+
                 overnight_sig = {
                     "article_id": article_id,
                     "symbol": feature_row.get("symbol"),
@@ -303,18 +313,19 @@ def run_signal_predictor(signals_new_path=None, signals_all_path=None):
                     "source": original_article.get("source", raw_article.get("source", "Unknown")),
                     "published_time": feature_row.get("published_time"),
                     "full_content": raw_article.get("content", original_article.get("condensed_text", "")),
-                    "sentiment": feature_row.get("sentiment"),
+                    "sentiment": sentiment,
                     "sentiment_score": feature_row.get("sentiment_score"),
-                    "confidence": feature_row.get("confidence"),
+                    "confidence": confidence,
                     
-                    # Placeholder values for compatibility
-                    "predicted_signal": "HOLD",  # Default to Neutral/Hold overnight
-                    "signal_confidence": 0.0,
-                    "buy_prob": 0.0,
-                    "sell_prob": 0.0,
-                    "hold_prob": 1.0, 
+                    # Sentiment-based bias labels
+                    "predicted_signal": pred_sig, 
+                    "signal_confidence": round(confidence, 4),
+                    "buy_prob": round(confidence if sentiment == "Positive" else 0.0, 4),
+                    "sell_prob": round(confidence if sentiment == "Negative" else 0.0, 4),
+                    "hold_prob": round(confidence if sentiment == "Neutral" else 0.0, 4), 
                     "model_version": "overnight_bias",
                     "url": raw_article.get("url", ""),
+                    "condensed_text": original_article.get("condensed_text", ""),
                     "predicted_at": (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).strftime("%Y-%m-%d %H:%M:%S IST"),
                     "is_overnight": True
                 }
