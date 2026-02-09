@@ -146,9 +146,16 @@ with st.sidebar:
 
 # Filter Data based on Active Tab
 if st.session_state.active_tab == "recent":
-    df = st.session_state.data_new
+    df_raw = st.session_state.data_new
+    # Filter to show only "today's" news in the recent tab
+    if not df_raw.empty and 'date' in df_raw.columns:
+         today = datetime.now().date()
+         df = df_raw[df_raw['date'] == today]
+    else:
+         df = df_raw
+
     if st.session_state.get("is_overnight", False):
-        page_title = "🌙 OVERNIGHT NEWS (MARKET CLOSED)"
+        page_title = "🌙 AFTER MARKET HOUR NEWS"
         st.info("ℹ️ Market Closed: Showing overnight news sentiment bias. Trade signals will generate at 9:30 AM.")
     else:
         page_title = "RECENT SIGNALS (LATEST BATCH)"
