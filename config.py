@@ -97,11 +97,11 @@ RECENT_MERGED_PATH = MERGED_NEWS_NEW_PATH
 
 # ============== OHLCV Fetcher Paths ==============
 OHLCV_OUTPUT_DIR = os.path.join(OUTPUT_DIR, "data_fetch_ohlcv")
-OHLCV_MAPPING_PATH = os.path.join(BASE_DIR, "CORRECT OHLCV TICK DATA", "mapping_security_ids.csv")
+OHLCV_MAPPING_PATH = os.path.join(BASE_DIR, "correct_ohlcv_tick_data", "mapping_security_ids.csv")
 
 # Directory containing the actual tick/OHLCV data CSVs
 # Using the corrected data source provided by user (files are in group_XX)
-OHLCV_DATA_DIR = os.path.join(BASE_DIR, "CORRECT OHLCV TICK DATA", "data_ohlcv", "group_XX")
+OHLCV_DATA_DIR = os.path.join(BASE_DIR, "correct_ohlcv_tick_data", "data_ohlcv", "group_XX")
 
 # ============== Price Mapping Output Paths ==============
 PRICE_MAPPED_OUTPUT_DIR = os.path.join(OUTPUT_DIR, "price_mapped")
