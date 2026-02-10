@@ -15,6 +15,8 @@ class TokenManager:
 
     def __init__(self, token_file_path="dhan_token.json"):
         self.token_file_path = token_file_path
+        self.last_loaded_token = None  # The token string that was last successfully loaded/notified
+
 
     def load_token(self) -> Optional[Dict]:
         if not os.path.exists(self.token_file_path):
@@ -54,7 +56,7 @@ class TokenManager:
             print(f"[TokenManager] JWT expiry decode failed: {e}")
             return 0
 
-    def is_token_expired(self, token_data: Dict, buffer_seconds: int = 300) -> bool:
+    def is_token_expired(self, token_data: Dict, buffer_seconds: int = 21600) -> bool:
         expires_at = token_data.get("expires_at")
         if not expires_at:
             return True
@@ -153,12 +155,35 @@ class TokenManager:
             renewed_data = self.renew_token(access_token, client_id)
             
             if renewed_data:
+                self.last_loaded_token = renewed_data["access_token"]
                 return renewed_data["access_token"], renewed_data["client_id"]
             else:
                 print("[TokenManager] ❌ Token renewal failed. Please regenerate token manually.")
                 return None, None
 
+        self.last_loaded_token = access_token
         return access_token, client_id
+
+    def has_token_changed(self) -> bool:
+        """
+        Checks if the token in the file is different from self.last_loaded_token.
+        This is useful for long-running processes to detect external updates or 
+        internal renewals that they haven't picked up yet.
+        """
+        token_data = self.load_token()
+        if not token_data:
+            return False
+        
+        on_disk_token = token_data.get("access_token")
+        if not on_disk_token:
+            return False
+            
+        changed = on_disk_token != self.last_loaded_token
+        if changed:
+            print(f"[TokenManager] Detection: Token on disk has changed!")
+            
+        return changed
+
 
 
 if __name__ == "__main__":

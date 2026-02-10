@@ -82,6 +82,8 @@ MODELS_DIR = os.path.join(BASE_DIR, "models")
 SIGNALS_OUTPUT_DIR = os.path.join(OUTPUT_DIR, "signals")
 SIGNALS_ALL_PATH = os.path.join(SIGNALS_OUTPUT_DIR, "all_signals.json")
 SIGNALS_NEW_PATH = os.path.join(SIGNALS_OUTPUT_DIR, "signals_new.json")
+OVERNIGHT_BUFFER_PATH = os.path.join(SIGNALS_OUTPUT_DIR, "overnight_buffer.json")
+OVERNIGHT_SIGNAL_PATH = os.path.join(SIGNALS_OUTPUT_DIR, "overnight_signal.json")
 
 # ============== Mapping Files ==============
 COMPANY_MAPPING_PATH = os.path.join(MAPPING_DIR, "companywise_keyword_mapping.csv.csv")

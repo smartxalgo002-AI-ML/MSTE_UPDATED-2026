@@ -21,18 +21,29 @@ TOKEN_PATH = os.path.join(BASE_DIR, "dhan_token.json")
 
 token_manager = TokenManager(TOKEN_PATH)
 
-ACCESS_TOKEN, CLIENT_ID = token_manager.get_valid_token()
+# Global Variables (Updated dynamically)
+ACCESS_TOKEN, CLIENT_ID = None, None
+WS_URL = None
 
-if not ACCESS_TOKEN or not CLIENT_ID:
-    raise RuntimeError("❌ Failed to load valid token. Please check dhan_token.json")
+def update_global_token():
+    """Update global token variables and WS_URL from TokenManager"""
+    global ACCESS_TOKEN, CLIENT_ID, WS_URL
+    at, cid = token_manager.get_valid_token()
+    if at and cid:
+        ACCESS_TOKEN, CLIENT_ID = at, cid
+        WS_URL = f"wss://api-feed.dhan.co?version=2&token={ACCESS_TOKEN}&clientId={CLIENT_ID}&authType=2"
+        return True
+    return False
 
-WS_URL = f"wss://api-feed.dhan.co?version=2&token={ACCESS_TOKEN}&clientId={CLIENT_ID}&authType=2"
+# Initial token load
+if not update_global_token():
+     raise RuntimeError("❌ Failed to load valid token. Please check dhan_token.json")
 
-# Print client ID and token info (masked for security)
 print(f"[Config] Using Client ID: {CLIENT_ID}")
 print(f"[Config] Token length: {len(ACCESS_TOKEN)} chars")
 print(f"[Config] Token starts with: {ACCESS_TOKEN[:20]}...")
 print(f"[Config] WebSocket URL: wss://api-feed.dhan.co?version=2&token=***&clientId={CLIENT_ID}&authType=2")
+
 
 
 OUTPUT_ROOT = os.path.join(os.getenv("TICKS_BASE_DIR", "data_ohlcv"), "group_XX")
@@ -330,8 +341,8 @@ def get_subscription_payload(ids):
     })
 
 class DhanClient:
-    def __init__(self, url, sec_ids, batch_size=SUBSCRIPTION_BATCH_SIZE, batch_delay=SUBSCRIPTION_BATCH_DELAY):
-        self.url = url
+    def __init__(self, token_manager, sec_ids, batch_size=SUBSCRIPTION_BATCH_SIZE, batch_delay=SUBSCRIPTION_BATCH_DELAY):
+        self.token_manager = token_manager
         self.sec_ids = sec_ids
         self.ws = None
         self.stop_flag = False
@@ -341,6 +352,8 @@ class DhanClient:
         self.batch_delay = batch_delay
         self.subscription_sent = False
         self.subscription_start_time = None
+        self.reconnect_requested = False
+
 
     def on_open(self, ws):
         self.ws = ws
@@ -417,6 +430,10 @@ class DhanClient:
 
     def on_error(self, ws, error):
         error_str = str(error)
+        # Suppress noise when we purposefully closed the connection
+        if self.stop_flag or self.reconnect_requested:
+            return
+
         print(f"[WS] error (Client ID: {CLIENT_ID}): {error}")
         
         # Check for client ID specific issues
@@ -428,28 +445,43 @@ class DhanClient:
             print(f"[WS]   3. Token might be invalid or expired")
             print(f"[WS]   4. Client ID might be on a trial/demo account")
         
-        import traceback
-        traceback.print_exc()
+        # Suppress 'NoneType' attribute errors which can happen during race conditions in shutdown
+        if "NoneType" not in error_str:
+            import traceback
+            traceback.print_exc()
+
 
     def on_close(self, ws, code, msg):
-        print("[WS] closed:", code, msg)
+        if not self.stop_flag and not self.reconnect_requested:
+            print("[WS] closed:", code, msg)
+
 
     def run_forever(self):
         backoff = 1
         while not self.stop_flag:
             try:
-                print(f"[WS] Attempting connection with Client ID: {CLIENT_ID}")
+                # Always fetch fresh token/ID and generate URL before connecting
+                at, cid = self.token_manager.get_valid_token()
+                if not at:
+                    print(f"[WS] ❌ Cannot connect: Failed to get valid token. Retrying in 30s...")
+                    time.sleep(30)
+                    continue
+                
+                url = f"wss://api-feed.dhan.co?version=2&token={at}&clientId={cid}&authType=2"
+                print(f"[WS] Attempting connection with Client ID: {cid}")
                 self.ws = websocket.WebSocketApp(
-                    self.url,
+                    url,
                     on_open=self.on_open,
                     on_message=self.on_message,
                     on_error=self.on_error,
                     on_close=self.on_close
                 )
+                self.reconnect_requested = False
                 self.ws.run_forever(ping_interval=20, ping_timeout=10)
             except Exception as e:
                 error_str = str(e)
-                print(f"[WS] Connection error (Client ID: {CLIENT_ID}): {e}")
+                print(f"[WS] Connection error: {e}")
+
                 
                 # Check for client ID specific issues
                 if "429" in error_str or "Too many requests" in error_str or "blocked" in error_str.lower():
@@ -500,7 +532,22 @@ def run_daily_session():
     """Run one daily session from now until market close"""
     global stop_flag, closed_candles, candles, last_n_closes
     
-    # Reset state
+    now_ist = datetime.now(IST)
+    current_time = now_ist.time()
+    
+    # 1. PRE-CHECK: If market is already closed, don't start anything
+    if current_time.hour > 15 or (current_time.hour == 15 and current_time.minute >= 31):
+        print(f"[System] Market is currently closed ({now_ist.strftime('%H:%M:%S')} IST). Skipping session.")
+        return
+
+    # 2. PRE-CHECK: If it's too early, wait until pre-market
+    target_start = now_ist.replace(hour=9, minute=0, second=0, microsecond=0)
+    if now_ist < target_start:
+        wait_secs = (target_start - now_ist).total_seconds()
+        print(f"[System] Market hasn't opened yet. Waiting {wait_secs/60:.1f} mins until 09:00 AM IST...")
+        return # Let the main loop handle the sleep
+
+    # Reset state for the new session
     stop_flag = False
     closed_candles = []
     candles = {}
@@ -533,12 +580,42 @@ def run_daily_session():
     start = 0
     while start < total:
         grp = SECURITY_IDS[start:start+MAX_PER_CONNECTION]
-        c = DhanClient(WS_URL, grp)
+        c = DhanClient(token_manager, grp)
         t = threading.Thread(target=c.run_forever, daemon=True)
         clients.append(c)
         threads.append(t)
         t.start()
         start += MAX_PER_CONNECTION
+
+    # Token watcher to handle automatic renewal and signal reconnections
+    def token_watcher_loop():
+        nonlocal clients
+        print("[System] Token watcher thread started.")
+        while not stop_flag:
+            try:
+                # Check for renewal/updates every 5 minutes
+                # Use a small buffer to trigger renewal well before actual expiry
+                at, cid = token_manager.get_valid_token()
+                
+                # Check if any client needs to reconnect due to token change
+                if token_manager.has_token_changed():
+                    print("[System] 🔄 Token change detected! Signaling all clients to reconnect...")
+                    for c in clients:
+                        c.reconnect_requested = True
+                        if c.ws:
+                            c.ws.close() # This will trigger run_forever to loop and get new token
+                
+            except Exception as e:
+                print(f"[System] Token watcher error: {e}")
+            
+            # Sleep in chunks to remain responsive to stop_flag
+            for _ in range(300): # 300 seconds = 5 minutes
+                if stop_flag: break
+                time.sleep(1)
+
+    t_watcher = threading.Thread(target=token_watcher_loop, daemon=True)
+    t_watcher.start()
+
 
     def check_market_close():
         """Check if market is closed and return True if we should stop"""
@@ -597,6 +674,7 @@ def run_daily_session():
             for _, candle in candles.items():
                 write_ohlcv(candle)
         print("Session End: Cleanup complete.")
+
 
 # =========================
 # MAIN LOOP (Runs Forever)
