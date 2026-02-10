@@ -30,11 +30,11 @@ output/sentiment/*.json
 
 # OHLCV data
 data_ohlcv/
-CORRECT OHLCV TICK DATA/data_ohlcv/
+correct_ohlcv_tick_data/data_ohlcv/
 
 # Sensitive files
 dhan_token.json
-CORRECT OHLCV TICK DATA/dhan_token.json
+correct_ohlcv_tick_data/dhan_token.json
 *.env
 .env
 
