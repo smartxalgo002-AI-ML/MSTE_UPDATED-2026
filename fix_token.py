@@ -3,7 +3,7 @@ import base64
 import time
 import os
 
-TOKEN_FILE = r"D:\Final_MSTE_Long_Debert\News_Sentiment_Model_Step1\CORRECT OHLCV TICK DATA\dhan_token.json"
+TOKEN_FILE = r"D:\Final_MSTE_Long_Debert\News_Sentiment_Model_Step1\correct_ohlcv_tick_data\dhan_token.json"
 
 def extract_expiry(token):
     try:
