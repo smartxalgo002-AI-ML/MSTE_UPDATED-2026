@@ -23,8 +23,8 @@ CORR_DIR.mkdir(parents=True, exist_ok=True)
 SIG_RECENT = SIG_DIR / "signals_recent.json"
 SIG_FALLBACK = SIG_DIR / "signals.json"
 
-DATA_OHLCV_ROOT = ROOT / "Data Fetch ohlcv"
-MAP_CSV = ROOT / "CORRECT OHLCV TICK DATA" / "mapping_security_ids.csv"
+DATA_OHLCV_ROOT = ROOT / "correct_ohlcv_tick_data"
+MAP_CSV = ROOT / "correct_ohlcv_tick_data" / "mapping_security_ids.csv"
 OHLCV_BASE = DATA_OHLCV_ROOT / "data_ohlcv"
 
 IST = ZoneInfo("Asia/Kolkata")

@@ -106,11 +106,11 @@ def load_json(path: str) -> list:
 
 
 def append_to_all(all_path: str, new_rows: list) -> list:
-    """Append new_rows to all_path, deduplicating by article_id."""
+    """Append new_rows to all_path, deduplicating by (article_id, symbol)."""
     existing = load_json(all_path)
-    existing_ids = {r.get("article_id") for r in existing}
+    existing_keys = {(r.get("article_id"), r.get("symbol")) for r in existing}
     
-    fresh = [r for r in new_rows if r.get("article_id") not in existing_ids]
+    fresh = [r for r in new_rows if (r.get("article_id"), r.get("symbol")) not in existing_keys]
     
     if fresh:
         all_data = existing + fresh

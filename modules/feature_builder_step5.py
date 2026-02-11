@@ -131,13 +131,13 @@ def load_json(path: str) -> list:
 
 def append_to_all(all_path: str, new_features: list) -> list:
     """
-    Append new_features to all_path, deduplicating by article_id.
+    Append new_features to all_path, deduplicating by (article_id, symbol).
     Returns the list of truly new features that were appended.
     """
     existing = load_json(all_path)
-    existing_ids = {f.get("article_id") for f in existing}
+    existing_keys = {(f.get("article_id"), f.get("symbol")) for f in existing}
     
-    fresh = [f for f in new_features if f.get("article_id") not in existing_ids]
+    fresh = [f for f in new_features if (f.get("article_id"), f.get("symbol")) not in existing_keys]
     
     if fresh:
         all_data = existing + fresh

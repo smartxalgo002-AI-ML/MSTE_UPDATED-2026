@@ -246,31 +246,35 @@ def tag_and_save_articles():
             json.dump([], f_json, ensure_ascii=False, indent=2)
         return []
 
-    # Load existing tagged data for deduplication
+    # Load existing tagged data for deduplication using (article_id, symbol) key
     existing_data = []
-    existing_ids = set()
+    existing_keys = set()  # Composite key: (article_id, symbol)
     if os.path.exists(TAGGED_OUTPUT_PATH):
         with open(TAGGED_OUTPUT_PATH, "r", encoding="utf-8") as f_old:
             try:
                 existing_data = json.load(f_old)
-                existing_ids = {item.get("article_id") for item in existing_data}
+                existing_keys = {(item.get("article_id"), item.get("Symbol")) for item in existing_data}
             except Exception:
                 existing_data = []
 
     tagged_rows = []
+    seen_in_run = set()  # Same-run dedup: (article_id, symbol)
+    
     for article in articles:
         article_id = article.get("article_id", "")
-        
-        # Skip if already tagged
-        if article_id in existing_ids:
-            continue
-        
         headline = article.get("headline", "")
         content = article.get("content", "")
         tagged = tag_companies(headline, content)
         
         if tagged:
             for company in tagged:
+                symbol = company["Symbol"]
+                key = (article_id, symbol)
+                
+                # Skip if already in cumulative file OR already processed this run
+                if key in existing_keys or key in seen_in_run:
+                    continue
+                
                 tagged_rows.append({
                     "article_id": article_id,
                     "headline": headline,
@@ -279,11 +283,12 @@ def tag_and_save_articles():
                     "published_time": article.get("published_time", ""),
                     "scraped_at": article.get("scraped_at", ""),
                     "CompanyName": company["CompanyName"],
-                    "Symbol": company["Symbol"],
+                    "Symbol": symbol,
                     "Sector": company["Sector"],
                     "Index": company["Index"],
                     "url": article.get("url", "")
                 })
+                seen_in_run.add(key)
 
     if not tagged_rows:
         print("No new companies tagged in this run.")

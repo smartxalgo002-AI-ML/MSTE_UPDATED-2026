@@ -29,13 +29,13 @@ echo "Activating virtual environment..."
 source .venv/bin/activate
 
 # Check for Dhan token (for OHLCV collector)
-if [ ! -f "CORRECT OHLCV TICK DATA/dhan_token.json" ]; then
+if [ ! -f "correct_ohlcv_tick_data/dhan_token.json" ]; then
     echo ""
     echo "========================================"
     echo "WARNING: Dhan token file not found!"
     echo "========================================"
     echo ""
-    echo "The OHLCV collector requires: CORRECT OHLCV TICK DATA/dhan_token.json"
+    echo "The OHLCV collector requires: correct_ohlcv_tick_data/dhan_token.json"
     echo ""
     echo "Create the file with this format:"
     echo '{'
@@ -56,8 +56,8 @@ echo "========================================"
 echo "Starting OHLCV Market Data Collector..."
 echo "========================================"
 echo ""
-cd "CORRECT OHLCV TICK DATA"
-python3 "new ohlcv.py" &
+cd "correct_ohlcv_tick_data"
+python3 "new_ohlcv.py" &
 OHLCV_PID=$!
 echo "OHLCV Collector started with PID $OHLCV_PID"
 cd ..

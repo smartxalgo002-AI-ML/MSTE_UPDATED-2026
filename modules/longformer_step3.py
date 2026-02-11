@@ -171,12 +171,12 @@ def run_longformer(input_path: str = None) -> list:
     
     log(f"✔ Condensed {len(condensed_articles)} articles")
     
-    # Load existing all_condensed_news.json for deduplication
+    # Load existing all_condensed_news.json for deduplication using (article_id, symbol) key
     existing = load_json(CONDENSED_ALL_PATH)
-    existing_ids = {a.get("article_id") for a in existing}
+    existing_keys = {(a.get("article_id"), a.get("Symbol")) for a in existing}
     
-    # Find truly new articles
-    new_condensed = [a for a in condensed_articles if a.get("article_id") not in existing_ids]
+    # Find truly new articles using composite key
+    new_condensed = [a for a in condensed_articles if (a.get("article_id"), a.get("Symbol")) not in existing_keys]
     
     # Append to all_condensed_news.json
     if new_condensed:

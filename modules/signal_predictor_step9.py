@@ -97,23 +97,24 @@ def save_json(path, data):
 
 
 def append_to_all(all_path, new_rows):
-    """Upsert new_rows into all_path, updating existing ones and adding new ones."""
+    """Upsert new_rows into all_path, deduplicating by (article_id, symbol) composite key."""
     existing = load_json(all_path)
-    # Map article_id (as string) to index for quick lookup
-    existing_map = {str(r.get("article_id")): i for i, r in enumerate(existing)}
+    # Map (article_id, symbol) tuple to index for quick lookup
+    existing_map = {(str(r.get("article_id")), str(r.get("symbol"))): i for i, r in enumerate(existing)}
     
     added_count = 0
     updated_count = 0
     
     for row in new_rows:
-        aid = str(row.get("article_id"))
-        if aid in existing_map:
-            idx = existing_map[aid]
+        key = (str(row.get("article_id")), str(row.get("symbol")))
+        if key in existing_map:
+            idx = existing_map[key]
             # Update existing record (merges new fields like source/full_content/url)
             existing[idx].update(row)
             updated_count += 1
         else:
             existing.append(row)
+            existing_map[key] = len(existing) - 1  # Track newly added
             added_count += 1
     
     if added_count > 0 or updated_count > 0:
@@ -123,7 +124,7 @@ def append_to_all(all_path, new_rows):
         log(f"🟡 No changes for {all_path}")
     
     # Return count of truly new records for compatibility
-    return [r for r in new_rows if str(r.get("article_id")) not in existing_map]
+    return [r for r in new_rows if (str(r.get("article_id")), str(r.get("symbol"))) not in {(str(e.get("article_id")), str(e.get("symbol"))) for e in existing}]
 
 
 
@@ -144,7 +145,11 @@ def repair_all_signals(all_path, raw_news_map):
     repaired_count = 0
     
     for row in data:
+        # Use composite key for lookup
         aid = str(row.get("article_id"))
+        symbol = str(row.get("symbol", ""))
+        
+        # Try finding raw data by article_id (raw news is keyed by article_id only)
         raw = raw_news_map.get(aid)
         if raw:
             # Check if any field is missing or generic

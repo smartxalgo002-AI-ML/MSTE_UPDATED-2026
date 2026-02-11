@@ -25,13 +25,13 @@ echo Activating virtual environment...
 call .venv\Scripts\activate.bat
 
 REM Check for Dhan token (for OHLCV collector)
-if not exist "CORRECT OHLCV TICK DATA\dhan_token.json" (
+if not exist "correct_ohlcv_tick_data\dhan_token.json" (
     echo.
     echo ========================================
     echo WARNING: Dhan token file not found!
     echo ========================================
     echo.
-    echo The OHLCV collector requires: CORRECT OHLCV TICK DATA\dhan_token.json
+    echo The OHLCV collector requires: correct_ohlcv_tick_data\dhan_token.json
     echo.
     echo Create the file with this format:
     echo {
@@ -52,7 +52,7 @@ echo ========================================
 echo Starting OHLCV Market Data Collector...
 echo ========================================
 echo.
-start "OHLCV Collector" cmd /k "call .venv\Scripts\activate.bat && cd "CORRECT OHLCV TICK DATA" && python "new ohlcv.py""
+start "OHLCV Collector" cmd /k "call .venv\Scripts\activate.bat && cd "correct_ohlcv_tick_data" && python "new_ohlcv.py""
 
 REM Start the pipeline (in this window)
 echo.

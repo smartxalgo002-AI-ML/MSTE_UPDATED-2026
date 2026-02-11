@@ -156,7 +156,7 @@ News_Sentiment_Model_Step1/
 │   ├── xgboost_trainer_step8.py
 │   └── signal_predictor_step9.py
 │
-├── CORRECT OHLCV TICK DATA/   # 📈 Market Data Engine
+├── correct_ohlcv_tick_data/   # 📈 Market Data Engine
 │   ├── new ohlcv.py           # The 24/7 Collector Script
 │   └── token_manager.py       # Auto-renews Dhan tokens
 │
@@ -172,7 +172,7 @@ News_Sentiment_Model_Step1/
 
 ## ⚙️ Configuration
 - **`config.py`**: Main path settings and module configuration.
-- **`CORRECT OHLCV TICK DATA/new ohlcv.py`**: Collection schedule (09:00 - 15:31).
+- **`correct_ohlcv_tick_data/new_ohlcv.py`**: Collection schedule (09:00 - 15:31).
 - **`dhan_token.json`**: Token storage (auto-renews via `token_manager.py`).
 - **`fix_token.py`**: Utility to manually synchronize/fix token metadata.
 

@@ -58,7 +58,7 @@ mkdir -p output/ohlcv_merger
 mkdir -p output/labels
 mkdir -p output/signals
 mkdir -p models
-mkdir -p "CORRECT OHLCV TICK DATA/data_ohlcv/group_XX"
+mkdir -p "correct_ohlcv_tick_data/data_ohlcv/group_XX"
 
 # Make scripts executable
 echo ""
@@ -70,10 +70,10 @@ chmod +x run_dashboard.sh
 # Check for mapping files
 echo ""
 echo "📋 Checking mapping files..."
-if [ -f "mapping/companywise_keyword_mapping.csv.csv" ]; then
+if [ -f "mapping/companywise_keyword_mapping.csv" ]; then
     echo "✓ Company mapping file found"
 else
-    echo "⚠️  WARNING: mapping/companywise_keyword_mapping.csv.csv not found"
+    echo "⚠️  WARNING: mapping/companywise_keyword_mapping.csv not found"
 fi
 
 if [ -f "mapping/index_mapping.csv" ]; then
@@ -89,7 +89,7 @@ echo "✅ Setup complete!"
 echo ""
 echo "📝 Next steps:"
 echo "1. Activate virtual environment: source .venv/bin/activate"
-echo "2. Create CORRECT OHLCV TICK DATA/dhan_token.json with your Dhan credentials"
+echo "2. Create correct_ohlcv_tick_data/dhan_token.json with your Dhan credentials"
 echo "3. Run the pipeline: ./run_news_pipeline.sh"
 echo ""
 echo "For AWS deployment, see aws_deployment_guide.md"

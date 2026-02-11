@@ -51,13 +51,13 @@ CSV_PATH = os.path.join(BASE_DIR, "mapping_security_ids.csv")
 PRINT_TICKS = True
 
 HV_WINDOW = 60  # number of past candles to calculate HV
-SUBSCRIPTION_BATCH_SIZE = 50  # Increased from 10 to 50 for faster subscription
-SUBSCRIPTION_BATCH_DELAY = 0.5  # Reduced from 3.0 to 0.5 seconds
-BATCHES_PER_WINDOW = 10  # Increased from 5 to 10 before pause
-WINDOW_PAUSE_SECONDS = 15.0  # Reduced from 30 to 15 seconds
-MAX_PER_CONNECTION = int(os.getenv("MAX_PER_CONNECTION", "400"))
-MAX_SUBSCRIPTION_RETRIES = 3  # Retry failed subscriptions
-RETRY_DELAY = 2.0  # Delay between retries in seconds
+SUBSCRIPTION_BATCH_SIZE = 50  
+SUBSCRIPTION_BATCH_DELAY = 1.0  # Increased to 1.0s to avoid rate limits
+BATCHES_PER_WINDOW = 10  
+WINDOW_PAUSE_SECONDS = 30.0  # Increased to 30s to allow server cool-down
+MAX_PER_CONNECTION = int(os.getenv("MAX_PER_CONNECTION", "2500")) # Consolidated to single connection
+MAX_SUBSCRIPTION_RETRIES = 3  
+RETRY_DELAY = 5.0  # Increased retry delay
 
 # Time-driven candle closing configuration
 GRACE_WINDOW_SECONDS = 2  # Accept ticks up to 2 seconds after minute boundary
@@ -480,17 +480,24 @@ class DhanClient:
                 self.ws.run_forever(ping_interval=20, ping_timeout=10)
             except Exception as e:
                 error_str = str(e)
-                print(f"[WS] Connection error: {e}")
+                print(f"[WS] Connection attempt failed: {e}")
 
+                # Check for rate limit specifically during connection/handshake
+                if "429" in error_str or "Too many requests" in error_str:
+                    print(f"\n{'!'*60}")
+                    print(f"⚠️  RATELIMIT DETECTED: Your IP is currently blocked by Dhan.")
+                    print(f"⚠️  System will COOL DOWN for 5 MINUTES to let the block clear.")
+                    print(f"⚠️  Please DO NOT restart the script; let it wait.")
+                    print(f"{'!'*60}\n")
+                    time.sleep(300) # Mandatory 5 minute wait
+                    backoff = 30 # Reset backoff to something sensible after long wait
+                else:
+                    # Regular backoff for other errors
+                    time.sleep(backoff)
+                    backoff = min(backoff * 2, 60)
                 
-                # Check for client ID specific issues
-                if "429" in error_str or "Too many requests" in error_str or "blocked" in error_str.lower():
-                    print(f"[WS] ⚠️  This client ID may have different limits than your working client ID")
-                    print(f"[WS] Consider: Using fewer concurrent connections or longer delays")
             if self.stop_flag:
                 break
-            time.sleep(backoff)
-            backoff = min(backoff * 2, 60)
 
     def stop(self):
         self.stop_flag = True
@@ -586,6 +593,9 @@ def run_daily_session():
         threads.append(t)
         t.start()
         start += MAX_PER_CONNECTION
+        if start < total:
+            print(f"[System] Waiting 5s before starting next connection group...")
+            time.sleep(5)
 
     # Token watcher to handle automatic renewal and signal reconnections
     def token_watcher_loop():

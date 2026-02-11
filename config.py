@@ -86,7 +86,7 @@ OVERNIGHT_BUFFER_PATH = os.path.join(SIGNALS_OUTPUT_DIR, "overnight_buffer.json"
 OVERNIGHT_SIGNAL_PATH = os.path.join(SIGNALS_OUTPUT_DIR, "overnight_signal.json")
 
 # ============== Mapping Files ==============
-COMPANY_MAPPING_PATH = os.path.join(MAPPING_DIR, "companywise_keyword_mapping.csv.csv")
+COMPANY_MAPPING_PATH = os.path.join(MAPPING_DIR, "companywise_keyword_mapping.csv")
 INDEX_MAPPING_PATH = os.path.join(MAPPING_DIR, "index_mapping.csv")
 
 # Aliases for company_tagging_step2.py

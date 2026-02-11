@@ -50,15 +50,15 @@ if not exist "output\ohlcv_merger" mkdir output\ohlcv_merger
 if not exist "output\labels" mkdir output\labels
 if not exist "output\signals" mkdir output\signals
 if not exist "models" mkdir models
-if not exist "CORRECT OHLCV TICK DATA\data_ohlcv\group_XX" mkdir "CORRECT OHLCV TICK DATA\data_ohlcv\group_XX"
+if not exist "correct_ohlcv_tick_data\data_ohlcv\group_XX" mkdir "correct_ohlcv_tick_data\data_ohlcv\group_XX"
 
 REM Check for mapping files
 echo.
 echo Checking mapping files...
-if exist "mapping\companywise_keyword_mapping.csv.csv" (
+if exist "mapping\companywise_keyword_mapping.csv" (
     echo Company mapping file found
 ) else (
-    echo WARNING: mapping\companywise_keyword_mapping.csv.csv not found
+    echo WARNING: mapping\companywise_keyword_mapping.csv not found
 )
 
 if exist "mapping\index_mapping.csv" (
@@ -73,7 +73,7 @@ echo Setup complete!
 echo.
 echo Next steps:
 echo 1. Activate virtual environment: .venv\Scripts\activate
-echo 2. Create "CORRECT OHLCV TICK DATA\dhan_token.json" with your Dhan credentials
+echo 2. Create "correct_ohlcv_tick_data\dhan_token.json" with your Dhan credentials
 echo 3. Run the pipeline: python main.py
 echo.
 echo ========================================

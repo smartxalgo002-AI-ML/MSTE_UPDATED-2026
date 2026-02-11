@@ -5,12 +5,12 @@ After=network.target
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/home/ubuntu/News_Sentiment_Model_Step1/Dashboard_mste
+WorkingDirectory=/home/ubuntu/MSTE_Testing_2026/News_Sentiment_Model_Step1/Dashboard_mste
 ExecStart=/usr/local/bin/streamlit run app.py --server.port 8501 --server.address 0.0.0.0
 Restart=always
 RestartSec=10
-StandardOutput=append:/home/ubuntu/News_Sentiment_Model_Step1/logs/dashboard.log
-StandardError=append:/home/ubuntu/News_Sentiment_Model_Step1/logs/dashboard_error.log
+StandardOutput=append:/home/ubuntu/MSTE_Testing_2026/News_Sentiment_Model_Step1/logs/dashboard.log
+StandardError=append:/home/ubuntu/MSTE_Testing_2026/News_Sentiment_Model_Step1/logs/dashboard_error.log
 
 [Install]
 WantedBy=multi-user.target

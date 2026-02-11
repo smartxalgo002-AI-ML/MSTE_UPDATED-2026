@@ -112,7 +112,7 @@ python3 -c "import nltk; nltk.download('punkt'); nltk.download('stopwords')"
 Your `dhan_token.json` is private, so it's not on GitHub. You must create it manually.
 
 ```bash
-cd "CORRECT OHLCV TICK DATA"
+cd "correct_ohlcv_tick_data"
 nano dhan_token.json
 ```
 
@@ -155,7 +155,34 @@ chmod +x start.sh run_dashboard.sh
 
 ---
 
-## Step 8: View Dashboard (Optional)
+## Step 8: Use Systemd (Professional Way - Highly Recommended)
+
+Instead of `tmux`, you can set the system to start automatically when the server reboots and restart automatically if it crashes.
+
+```bash
+# 1. Copy service files to Systemd
+sudo cp news_pipeline.service /etc/systemd/system/
+sudo cp ohlcv_collector.service /etc/systemd/system/
+sudo cp dashboard.service /etc/systemd/system/
+
+# 2. Refresh systemd
+sudo systemctl daemon-reload
+
+# 3. Enable them to start on boot
+sudo systemctl enable news_pipeline ohlcv_collector dashboard
+
+# 4. Start them
+sudo systemctl start news_pipeline ohlcv_collector dashboard
+
+# 5. Check status
+sudo systemctl status news_pipeline
+```
+
+*Note: The service files assume the project is in `/home/ubuntu/MSTE_Testing_2026/News_Sentiment_Model_Step1`. If you cloned it into a different folder, you must edit the `WorkingDirectory` and `ExecStart` lines in the `.service` files using `nano`.*
+
+---
+
+## Step 9: View Dashboard (Optional)
 
 1.  Start a second session:
     ```bash

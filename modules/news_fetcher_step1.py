@@ -33,7 +33,7 @@ from modules.news_sources.livemint import pull as pull_livemint
 from modules.news_sources.the_economic_times import fetch_and_save_articles as fetch_et
 from modules.news_sources.cnbc_tv18 import fetch_and_save_articles as fetch_cnbc
 from modules.news_sources.business_today import collect_candidate_links, extract_content_and_time, extract_article_id as bt_extract_id
-from modules.news_sources.hindu_business_Line import fetch_bl_headlines, fetch_full_bl_article, extract_bl_article_id
+from modules.news_sources.hindu_business_line import fetch_bl_headlines, fetch_full_bl_article, extract_bl_article_id
 
 
 def fetch_business_today(max_articles: int = 12) -> list:

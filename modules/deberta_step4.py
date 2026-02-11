@@ -166,12 +166,12 @@ def run_deberta(input_path: str = None) -> list:
     
     log(f"✔ Analyzed {len(analyzed_articles)} articles")
     
-    # Load existing all_news_sentiment.json for deduplication
+    # Load existing all_news_sentiment.json for deduplication using (article_id, symbol) key
     existing = load_json(SENTIMENT_ALL_PATH)
-    existing_ids = {a.get("article_id") for a in existing}
+    existing_keys = {(a.get("article_id"), a.get("Symbol")) for a in existing}
     
-    # Find truly new articles
-    new_analyzed = [a for a in analyzed_articles if a.get("article_id") not in existing_ids]
+    # Find truly new articles using composite key
+    new_analyzed = [a for a in analyzed_articles if (a.get("article_id"), a.get("Symbol")) not in existing_keys]
     
     # Append to all_news_sentiment.json
     if new_analyzed:

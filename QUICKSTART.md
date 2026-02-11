@@ -32,7 +32,7 @@ setup.bat
 .venv\Scripts\activate
 
 # 3. Create Dhan token file
-# Edit: CORRECT OHLCV TICK DATA\dhan_token.json
+# Edit: correct_ohlcv_tick_data\dhan_token.json
 
 # 4. Run pipeline
 python main.py
@@ -48,7 +48,7 @@ chmod +x setup.sh
 source .venv/bin/activate
 
 # 3. Create Dhan token file
-nano "CORRECT OHLCV TICK DATA/dhan_token.json"
+nano "correct_ohlcv_tick_data/dhan_token.json"
 
 # 4. Run pipeline
 python3 main.py
@@ -58,7 +58,7 @@ python3 main.py
 
 ## Dhan Token Template
 
-Create `CORRECT OHLCV TICK DATA/dhan_token.json`:
+Create `correct_ohlcv_tick_data/dhan_token.json`:
 
 ```json
 {
@@ -132,5 +132,5 @@ News_Sentiment_Model_Step1/
 ├── output/                  # Generated data
 ├── models/                  # ML models
 ├── Dashboard_mste/          # Streamlit dashboard
-└── CORRECT OHLCV TICK DATA/ # Market data collector
+└── correct_ohlcv_tick_data/ # Market data collector
 ```
