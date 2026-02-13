@@ -335,12 +335,6 @@ def show_detail_view():
     """
     st.markdown(content_html, unsafe_allow_html=True)
     
-    # URL Link
-    if article.get('url'):
-        st.write("")
-        st.link_button("🌐 Read Original Article", article['url'], use_container_width=True)
-    
-    st.write("")  # Spacing
     
     # Cards Section
     col1, col2 = st.columns(2)

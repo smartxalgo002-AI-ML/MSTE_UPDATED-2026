@@ -70,14 +70,19 @@ def get_model():
 
 
 def condense_text(text: str) -> str:
-    """Condense text to top N sentences using Longformer scoring."""
+    """Condense text to top N sentences using semantic similarity ranking (batched)."""
     sentences = sent_tokenize(text)
     if len(sentences) <= TOP_SENTENCES:
         return text
     
+    # Limit to max 40 sentences to prevent memory issues
+    if len(sentences) > 40:
+        sentences = sentences[:40]
+    
     tokenizer, model = get_model()
     
-    inputs = tokenizer(
+    # Compute document embedding (mean pooling)
+    doc_inputs = tokenizer(
         text,
         return_tensors="pt",
         truncation=True,
@@ -85,26 +90,35 @@ def condense_text(text: str) -> str:
     ).to(DEVICE)
     
     with torch.no_grad():
-        outputs = model(**inputs)
+        doc_outputs = model(**doc_inputs)
+        # Mean pooling over sequence dimension
+        doc_embedding = doc_outputs.last_hidden_state.mean(dim=1)  # [1, hidden_dim]
     
-    # Lightweight sentence scoring based on token count
-    scores = []
-    for sent in sentences:
-        sent_inputs = tokenizer(
-            sent,
-            return_tensors="pt",
-            truncation=True,
-            max_length=128
-        )
-        score = sent_inputs["input_ids"].shape[1]
-        scores.append(score)
+    # Batch encode all sentences in ONE forward pass
+    sent_inputs = tokenizer(
+        sentences,
+        padding=True,
+        truncation=True,
+        return_tensors="pt",
+        max_length=512
+    ).to(DEVICE)
     
-    top_idx = sorted(
-        range(len(scores)),
-        key=lambda i: scores[i],
-        reverse=True
-    )[:TOP_SENTENCES]
+    with torch.no_grad():
+        sent_outputs = model(**sent_inputs)
+        # Mean pooling for each sentence
+        sent_embeddings = sent_outputs.last_hidden_state.mean(dim=1)  # [num_sentences, hidden_dim]
     
+    # Vectorized cosine similarity
+    similarities = torch.nn.functional.cosine_similarity(
+        doc_embedding.expand(sent_embeddings.size(0), -1),  # [num_sentences, hidden_dim]
+        sent_embeddings,  # [num_sentences, hidden_dim]
+        dim=1
+    )  # [num_sentences]
+    
+    # Rank sentences by similarity and select top N
+    top_idx = torch.argsort(similarities, descending=True)[:TOP_SENTENCES].cpu().tolist()
+    
+    # Keep top sentences in original order
     top_idx.sort()
     return " ".join(sentences[i] for i in top_idx)
 

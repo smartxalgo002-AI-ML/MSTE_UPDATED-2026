@@ -7,6 +7,7 @@ Creates merged_news.json with all sources combined
 import os
 import json
 from datetime import datetime
+import concurrent.futures
 
 from config import (
     MAX_ARTICLES,
@@ -82,6 +83,46 @@ def fetch_hindu_business_line(max_articles: int = 10) -> list:
             "source": "The Hindu Business Line"
         })
     return results
+
+
+def process_business_today(max_articles: int) -> list:
+    """Wrapper to fetch and save Business Today articles."""
+    log("▶ Fetching Business Today...")
+    try:
+        bt_articles = fetch_business_today(max_articles=max_articles)
+        if bt_articles:
+            fresh_bt = append_to_all(BUSINESS_TODAY_ALL_PATH, bt_articles)
+            save_json(BUSINESS_TODAY_NEW_PATH, fresh_bt)
+            log(f"✔ Business Today: {len(fresh_bt)} new articles")
+            return fresh_bt
+        else:
+            log("🟡 Business Today: No articles fetched")
+            save_json(BUSINESS_TODAY_NEW_PATH, [])
+            return []
+    except Exception as e:
+        log(f"✖ Business Today failed: {e}")
+        save_json(BUSINESS_TODAY_NEW_PATH, [])
+        return []
+
+
+def process_hindu_business_line(max_articles: int) -> list:
+    """Wrapper to fetch and save Hindu Business Line articles."""
+    log("▶ Fetching Hindu Business Line...")
+    try:
+        hbl_articles = fetch_hindu_business_line(max_articles=max_articles)
+        if hbl_articles:
+            fresh_hbl = append_to_all(HINDU_BL_ALL_PATH, hbl_articles)
+            save_json(HINDU_BL_NEW_PATH, fresh_hbl)
+            log(f"✔ Hindu Business Line: {len(fresh_hbl)} new articles")
+            return fresh_hbl
+        else:
+            log("🟡 Hindu Business Line: No articles fetched")
+            save_json(HINDU_BL_NEW_PATH, [])
+            return []
+    except Exception as e:
+        log(f"✖ Hindu Business Line failed: {e}")
+        save_json(HINDU_BL_NEW_PATH, [])
+        return []
 
 
 def log(msg: str):
@@ -175,93 +216,58 @@ def fetch_source(name: str, fetch_fn, all_path: str, new_path: str, max_articles
 def run_news_fetcher(max_articles: int = MAX_ARTICLES) -> list:
     """
     Main entry point for Step 1.
-    Fetches from all sources, saves per-source files, creates merged_news.json
+    Fetches from all sources in PARALLEL, saves per-source files, creates merged_news.json
     Returns the list of all new articles from this run.
     """
     log("=" * 60)
-    log("Step 1: News Fetcher Started")
+    log("Step 1: News Fetcher Started (Parallel Mode)")
     log("=" * 60)
     
     os.makedirs(NEWS_FETCHER_OUTPUT_DIR, exist_ok=True)
     
     all_new = []
     
-    # Moneycontrol
-    new_mc = fetch_source(
-        "Moneycontrol",
-        pull_moneycontrol,
-        MONEYCONTROL_ALL_PATH,
-        MONEYCONTROL_NEW_PATH,
-        max_articles
-    )
-    all_new.extend(new_mc)
+    # Define tasks for parallel execution
+    # Each task is a tuple: (function, name, args_dict)
+    tasks = [
+        # Moneycontrol
+        (fetch_source, "Moneycontrol", {
+            "name": "Moneycontrol", "fetch_fn": pull_moneycontrol, 
+            "all_path": MONEYCONTROL_ALL_PATH, "new_path": MONEYCONTROL_NEW_PATH, 
+            "max_articles": max_articles
+        }),
+        # LiveMint
+        (fetch_source, "LiveMint", {
+            "name": "LiveMint", "fetch_fn": pull_livemint, 
+            "all_path": LIVEMINT_ALL_PATH, "new_path": LIVEMINT_NEW_PATH, 
+            "max_articles": max_articles
+        }),
+        # Economic Times
+        (fetch_et, "Economic Times", {"max_articles": max_articles}),
+        # CNBC-TV18
+        (fetch_cnbc, "CNBC-TV18", {"max_articles": max_articles}),
+        # Business Today
+        (process_business_today, "Business Today", {"max_articles": max_articles}),
+        # Hindu Business Line
+        (process_hindu_business_line, "Hindu Business Line", {"max_articles": max_articles})
+    ]
     
-    # LiveMint
-    new_lm = fetch_source(
-        "LiveMint",
-        pull_livemint,
-        LIVEMINT_ALL_PATH,
-        LIVEMINT_NEW_PATH,
-        max_articles
-    )
-    all_new.extend(new_lm)
-    
-    # Economic Times (uses fetch_and_save_articles which handles its own file saving)
-    log("▶ Fetching Economic Times...")
-    try:
-        et_articles = fetch_et(max_articles=max_articles)
-        if et_articles:
-            log(f"✔ Economic Times: {len(et_articles)} new articles")
-            all_new.extend(et_articles)
-        else:
-            log("🟡 Economic Times: No new articles")
-    except Exception as e:
-        log(f"✖ Economic Times failed: {e}")
-    
-    # CNBC-TV18 (uses fetch_and_save_articles which handles its own file saving)
-    log("▶ Fetching CNBC-TV18...")
-    try:
-        cnbc_articles = fetch_cnbc(max_articles=max_articles)
-        if cnbc_articles:
-            log(f"✔ CNBC-TV18: {len(cnbc_articles)} new articles")
-            all_new.extend(cnbc_articles)
-        else:
-            log("🟡 CNBC-TV18: No new articles")
-    except Exception as e:
-        log(f"✖ CNBC-TV18 failed: {e}")
-    
-    # Business Today
-    log("▶ Fetching Business Today...")
-    try:
-        bt_articles = fetch_business_today(max_articles=max_articles)
-        if bt_articles:
-            fresh_bt = append_to_all(BUSINESS_TODAY_ALL_PATH, bt_articles)
-            save_json(BUSINESS_TODAY_NEW_PATH, fresh_bt)
-            log(f"✔ Business Today: {len(fresh_bt)} new articles")
-            all_new.extend(fresh_bt)
-        else:
-            log("🟡 Business Today: No articles fetched")
-            save_json(BUSINESS_TODAY_NEW_PATH, [])
-    except Exception as e:
-        log(f"✖ Business Today failed: {e}")
-        save_json(BUSINESS_TODAY_NEW_PATH, [])
-    
-    # Hindu Business Line
-    log("▶ Fetching Hindu Business Line...")
-    try:
-        hbl_articles = fetch_hindu_business_line(max_articles=max_articles)
-        if hbl_articles:
-            fresh_hbl = append_to_all(HINDU_BL_ALL_PATH, hbl_articles)
-            save_json(HINDU_BL_NEW_PATH, fresh_hbl)
-            log(f"✔ Hindu Business Line: {len(fresh_hbl)} new articles")
-            all_new.extend(fresh_hbl)
-        else:
-            log("🟡 Hindu Business Line: No articles fetched")
-            save_json(HINDU_BL_NEW_PATH, [])
-    except Exception as e:
-        log(f"✖ Hindu Business Line failed: {e}")
-        save_json(HINDU_BL_NEW_PATH, [])
-    
+    # Run tasks in parallel
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        future_map = {
+            executor.submit(func, **kwargs): name 
+            for func, name, kwargs in tasks
+        }
+        
+        for future in concurrent.futures.as_completed(future_map):
+            name = future_map[future]
+            try:
+                result = future.result()
+                if result:
+                    all_new.extend(result)
+            except Exception as e:
+                log(f"✖ Task failed for {name}: {e}")
+
     # Deduplicate merged
     merged = dedup_articles(all_new)
     if len(merged) != len(all_new):

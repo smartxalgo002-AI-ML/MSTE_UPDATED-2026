@@ -1,6 +1,6 @@
 {
     "model_version": "historic_v1",
-    "trained_at": "2026-02-03T05:24:04.807642",
+    "trained_at": "2026-02-13T09:21:53.559741",
     "training_rows": 16343,
     "data_source": "historic_dataset",
     "class_distribution": {
@@ -9,25 +9,25 @@
         "HOLD": 60.93
     },
     "validation_metrics": {
-        "accuracy": 0.7189,
-        "macro_f1": 0.5924,
-        "buy_recall": 0.3877,
-        "sell_recall": 0.3358,
+        "accuracy": 0.6268,
+        "macro_f1": 0.5914,
+        "buy_recall": 0.6273,
+        "sell_recall": 0.6657,
         "confusion_matrix": [
             [
-                233,
-                37,
-                331
+                377,
+                139,
+                85
             ],
             [
-                48,
-                227,
-                401
+                126,
+                450,
+                100
             ],
             [
-                47,
-                55,
-                1890
+                309,
+                461,
+                1222
             ]
         ]
     },

@@ -35,10 +35,26 @@ def load_json(path: str) -> list:
     return []
 
 
+# Custom JSON encoder to round floats only at output stage
+class RoundingJSONEncoder(json.JSONEncoder):
+    def encode(self, obj):
+        if isinstance(obj, float):
+            return format(obj, '.4f')
+        return super().encode(obj)
+    
+    def iterencode(self, obj, _one_shot=False):
+        """Recursively round floats in nested structures"""
+        if isinstance(obj, dict):
+            obj = {k: round(v, 4) if isinstance(v, float) else v for k, v in obj.items()}
+        elif isinstance(obj, list):
+            obj = [round(item, 4) if isinstance(item, float) else item for item in obj]
+        return super().iterencode(obj, _one_shot)
+
+
 def save_json(path: str, data: list):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+        json.dump(data, f, ensure_ascii=False, indent=4, cls=RoundingJSONEncoder)
 
 
 # Model config
@@ -81,14 +97,14 @@ def predict_sentiment(text: str) -> dict:
     probs = torch.softmax(outputs.logits, dim=1)[0]
     label_id = torch.argmax(probs).item()
     
-    # Extract probabilities for each class
+    # Extract probabilities for each class (full precision, no rounding)
     # LABELS = ["negative", "neutral", "positive"]
-    negative_prob = round(probs[0].item(), 2)
-    neutral_prob = round(probs[1].item(), 2)
-    positive_prob = round(probs[2].item(), 2)
+    negative_prob = probs[0].item()
+    neutral_prob = probs[1].item()
+    positive_prob = probs[2].item()
     
     # Calculate sentiment score: ranges from -1 (most negative) to +1 (most positive)
-    sentiment_score = round(positive_prob - negative_prob, 2)
+    sentiment_score = positive_prob - negative_prob
     
     return {
         "sentiment": LABELS[label_id],
@@ -96,7 +112,7 @@ def predict_sentiment(text: str) -> dict:
         "positive_prob": positive_prob,
         "negative_prob": negative_prob,
         "neutral_prob": neutral_prob,
-        "confidence": round(probs[label_id].item(), 4)
+        "confidence": probs[label_id].item()
     }
 
 

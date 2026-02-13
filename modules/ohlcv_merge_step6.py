@@ -4,6 +4,11 @@ Merges news features with 15-minute OHLCV data to create labeled training data.
 """
 import json
 import os
+import sys
+
+# Add parent directory to path to allow importing config
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 
@@ -56,25 +61,29 @@ def parse_published_time(published_time):
                 fmt = "%d %b %Y %I:%M:%S %p"
                 
             dt = datetime.strptime(dt_str, fmt)
-            return dt.replace(tzinfo=timezone.utc)
+            # Assume this is IST, convert to UTC properly
+            dt_ist = dt.replace(tzinfo=timezone(timedelta(hours=5, minutes=30)))
+            return dt_ist.astimezone(timezone.utc)
         
         # Format: "January 17, 2026/ 14:47 IST"
         if "/" in published_time and "IST" in published_time:
             dt_str = published_time.replace(" IST", "").replace("/", "")
             dt = datetime.strptime(dt_str.strip(), "%B %d, %Y %H:%M")
-            # Convert IST to UTC by subtracting 5 hours 30 minutes
-            dt_utc = dt - timedelta(hours=5, minutes=30)
-            return dt_utc.replace(tzinfo=timezone.utc)
+            # Proper IST → UTC conversion
+            dt_ist = dt.replace(tzinfo=timezone(timedelta(hours=5, minutes=30)))
+            return dt_ist.astimezone(timezone.utc)
         
-        # Format: "2026-01-17 17:25:29"
+        # Format: "2026-01-17 17:25:29" (assume IST)
         if "-" in published_time and ":" in published_time:
             dt = datetime.strptime(published_time[:19], "%Y-%m-%d %H:%M:%S")
-            return dt.replace(tzinfo=timezone.utc)
+            dt_ist = dt.replace(tzinfo=timezone(timedelta(hours=5, minutes=30)))
+            return dt_ist.astimezone(timezone.utc)
         
-        # Format: "January 17, 2026 at 02:44 PM"
+        # Format: "January 17, 2026 at 02:44 PM" (assume IST)
         if " at " in published_time:
             dt = datetime.strptime(published_time, "%B %d, %Y at %I:%M %p")
-            return dt.replace(tzinfo=timezone.utc)
+            dt_ist = dt.replace(tzinfo=timezone(timedelta(hours=5, minutes=30)))
+            return dt_ist.astimezone(timezone.utc)
         
     except Exception as e:
         log(f"Could not parse time '{published_time}': {e}")
@@ -144,15 +153,25 @@ def load_ohlcv(company_name, news_date):
 def find_next_15m_candle(df, news_time):
     """
     Get the 15-minute window after news by aggregating 1-minute candles.
-    Returns OHLCV for the 15 minutes following the news.
+    Finds first candle >= news_time, then aggregates next 15 minutes.
     """
     # Convert timezone-aware datetime to naive for pandas comparison
     if news_time.tzinfo is not None:
         news_time = news_time.replace(tzinfo=None)
     
-    # Find candles within the 15-minute window after news
-    end_time = news_time + timedelta(minutes=15)
-    window = df[(df["timestamp"] >= news_time) & (df["timestamp"] < end_time)]
+    # Find first candle at or after news time
+    post_news_data = df[df["timestamp"] >= news_time]
+    
+    if post_news_data.empty:
+        return None
+    
+    # Start from first candle >= news_time
+    start_candle = post_news_data.iloc[0]
+    start_time = start_candle["timestamp"]
+    end_time = start_time + timedelta(minutes=15)
+    
+    # Get 15-minute window from start_time
+    window = df[(df["timestamp"] >= start_time) & (df["timestamp"] < end_time)]
     
     if window.empty:
         return None
@@ -188,9 +207,14 @@ def get_pre_market_stats(company_name, news_time):
     if df is None:
         return {} # Truly no data found
 
-    # Make datetimes naive for comparison
+    # Make datetimes naive for comparison (timestamp in CSV is naive IST)
     if news_time.tzinfo is not None:
-        news_time = news_time.replace(tzinfo=None)
+        # Convert UTC back to IST (UTC + 5:30)
+        news_time_ist = news_time + timedelta(hours=5, minutes=30)
+        news_time = news_time_ist.replace(tzinfo=None)
+    else:
+        # Assume it's already naive IST if no timezone
+        pass
         
     # If we found data from a PREVIOUS day, effectively the "news time" relative to that data 
     # is the END of that day (uses the last known data)
@@ -293,15 +317,13 @@ def run_ohlcv_merge(input_path: str = None) -> list:
         # 1. Get Pre-Market / Pre-News Data (Input Features)
         pre_market_data = get_pre_market_stats(company_name, news_time)
         
-        # If we have absolutely no data (not even from previous days), we might skip or keep with defaults
-        # For training, it's safer to skip. For inference, maybe critical.
-        # User said: "if there is no pre market data availabele it will get the last available data"
-        # get_pre_market_stats handles the "last available" logic internally.
-        if not pre_market_data:
-            # log(f"Missing pre-market data for {company_name} at {news_time}")
-            continue
-
-        row.update(pre_market_data)
+        # Use whatever data is available - even if incomplete
+        # get_pre_market_stats already returns only available lookback windows
+        # If absolutely no data exists (empty dict), use the row anyway with null pre-market features
+        if pre_market_data:
+            row.update(pre_market_data)
+        else:
+            log(f"⚠️ No pre-market data for {company_name} ({symbol}) at {news_time} - using nearest available")
 
         # 2. Get Post-News Data (Training Label) for Label Generator
         # We need the 15-min reaction strictly AFTER the news.
@@ -318,6 +340,8 @@ def run_ohlcv_merge(input_path: str = None) -> list:
         if candle_data:
              row.update(candle_data)
         else:
+             # Log when 15m post-news data is missing
+             log(f"⚠️ Missing 15m post-news data for {company_name} ({symbol}) at {news_time}")
              # Mark as unlabelable (optional, label generator handles missing returns)
              pass
 

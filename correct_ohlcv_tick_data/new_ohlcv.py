@@ -28,16 +28,42 @@ WS_URL = None
 def update_global_token():
     """Update global token variables and WS_URL from TokenManager"""
     global ACCESS_TOKEN, CLIENT_ID, WS_URL
-    at, cid = token_manager.get_valid_token()
-    if at and cid:
-        ACCESS_TOKEN, CLIENT_ID = at, cid
-        WS_URL = f"wss://api-feed.dhan.co?version=2&token={ACCESS_TOKEN}&clientId={CLIENT_ID}&authType=2"
-        return True
-    return False
+    
+    # Load token data first
+    token_data = token_manager.load_token()
+    if not token_data:
+        return False
+    
+    at = token_data.get("access_token")
+    cid = token_data.get("client_id")
+    
+    if not at or not cid:
+        return False
+    
+    # Only attempt renewal if token expires within 1 hour (not 6 hours)
+    # This prevents premature API calls that return 400 errors
+    if token_manager.is_token_expired(token_data, buffer_seconds=3600):  # 1 hour
+        print("[Token] Expiring soon, attempting renewal...")
+        at, cid = token_manager.get_valid_token()
+        if not at or not cid:
+            # If renewal fails, check if current token is still usable
+            expires_at = token_data.get("expires_at", 0)
+            remaining = expires_at - int(time.time())
+            if remaining > 0:
+                print(f"[Token] Renewal failed but token still valid for {remaining/3600:.2f}h")
+                at = token_data.get("access_token")
+                cid = token_data.get("client_id")
+            else:
+                return False
+    
+    ACCESS_TOKEN, CLIENT_ID = at, cid
+    WS_URL = f"wss://api-feed.dhan.co?version=2&token={ACCESS_TOKEN}&clientId={CLIENT_ID}&authType=2"
+    return True
 
 # Initial token load
 if not update_global_token():
      raise RuntimeError("❌ Failed to load valid token. Please check dhan_token.json")
+
 
 print(f"[Config] Using Client ID: {CLIENT_ID}")
 print(f"[Config] Token length: {len(ACCESS_TOKEN)} chars")
@@ -51,13 +77,13 @@ CSV_PATH = os.path.join(BASE_DIR, "mapping_security_ids.csv")
 PRINT_TICKS = True
 
 HV_WINDOW = 60  # number of past candles to calculate HV
-SUBSCRIPTION_BATCH_SIZE = 50  
-SUBSCRIPTION_BATCH_DELAY = 1.0  # Increased to 1.0s to avoid rate limits
-BATCHES_PER_WINDOW = 10  
-WINDOW_PAUSE_SECONDS = 30.0  # Increased to 30s to allow server cool-down
-MAX_PER_CONNECTION = int(os.getenv("MAX_PER_CONNECTION", "2500")) # Consolidated to single connection
-MAX_SUBSCRIPTION_RETRIES = 3  
-RETRY_DELAY = 5.0  # Increased retry delay
+
+# WebSocket Connection Parameters - Optimized to prevent IP blocking
+SUBSCRIPTION_BATCH_SIZE = 20           # Reduced from 50 to 20 instruments per batch
+SUBSCRIPTION_BATCH_DELAY = 1.2         # Increased from 1.0 to 1.2 seconds between batches
+MAX_PER_CONNECTION = 350               # Split across multiple connections (was 2500)
+MAX_SUBSCRIPTION_RETRIES = 3           # Retry failed subscriptions
+RETRY_DELAY = 5.0                      # Delay between retries in seconds
 
 # Time-driven candle closing configuration
 GRACE_WINDOW_SECONDS = 2  # Accept ticks up to 2 seconds after minute boundary
@@ -401,11 +427,9 @@ class DhanClient:
                         print(f"[WS] send failed on batch {i+1} after {MAX_SUBSCRIPTION_RETRIES} attempts: {e}")
                         failed_batches.append((i+1, batch_ids))
             
+            
             if sent and i < num_batches - 1:
-                time.sleep(self.batch_delay)
-                if (i + 1) % BATCHES_PER_WINDOW == 0:
-                    print(f"[WS] Pausing {WINDOW_PAUSE_SECONDS:.1f}s to avoid server rate limits...")
-                    time.sleep(WINDOW_PAUSE_SECONDS)
+                time.sleep(self.batch_delay)  # Consistent delay between all batches
         
         self.subscription_sent = True
         print(f"[WS] Completed all {num_batches} subscription batches ({len(self.sec_ids)} total instruments).")

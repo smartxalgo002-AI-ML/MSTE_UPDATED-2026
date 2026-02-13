@@ -80,7 +80,6 @@ class TokenManager:
         Returns:
             Updated token data dict or None on failure
         """
-        token_data = self.load_token() or {}
         print("[TokenManager] 🔄 Attempting token renewal...")
         
         renew_url = "https://api.dhan.co/v2/RenewToken"
@@ -91,22 +90,16 @@ class TokenManager:
         
         try:
             response = requests.get(renew_url, headers=headers, timeout=10)
+            response.raise_for_status()
             
-            if response.status_code != 200:
-                print(f"[TokenManager] ❌ Renewal API failed with status {response.status_code}")
-                print(f"[TokenManager] Response: {response.text}")
-                return None
-                
             renew_data = response.json()
-            
-            # Dhan API sometimes nests data under a 'data' key or returns it directly
-            new_token = renew_data.get("access_token") or renew_data.get("data", {}).get("access_token")
+            new_token = renew_data.get("access_token")
             
             if not new_token:
-                print(f"[TokenManager] ❌ Renewal failed: No token in response. Data: {renew_data}")
+                print(f"[TokenManager] ❌ Renewal failed: No token in response")
                 return None
             
-            # Extract new expiry from JWT
+            # Extract new expiry
             new_expiry = self._extract_expiry_from_jwt(new_token)
             
             # Create updated token data
@@ -114,14 +107,12 @@ class TokenManager:
                 "access_token": new_token,
                 "client_id": client_id,
                 "expires_at": new_expiry,
-                "renewed_at": int(time.time()),
-                "api_key": token_data.get("api_key"),
-                "api_secret": token_data.get("api_secret")
+                "renewed_at": int(time.time())
             }
             
             # Save to file
             if self.save_token(updated_token_data):
-                print(f"[TokenManager] ✅ Token renewed successfully! New expiry (UTC): {datetime.fromtimestamp(new_expiry, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}")
+                print(f"[TokenManager] ✅ Token renewed successfully! New expiry: {new_expiry}")
                 return updated_token_data
             else:
                 print("[TokenManager] ❌ Failed to save renewed token")
@@ -154,10 +145,9 @@ class TokenManager:
             print("[TokenManager] ❌ Invalid token data.")
             return None, None
 
-        # Always extract expiry from JWT to ensure it's in sync with the actual token
-        jwt_expiry = self._extract_expiry_from_jwt(access_token)
-        if jwt_expiry > 0:
-            token_data["expires_at"] = jwt_expiry
+        # Ensure expiry exists
+        if "expires_at" not in token_data:
+            token_data["expires_at"] = self._extract_expiry_from_jwt(access_token)
 
         # Check if token needs renewal
         if self.is_token_expired(token_data):
@@ -168,16 +158,7 @@ class TokenManager:
                 self.last_loaded_token = renewed_data["access_token"]
                 return renewed_data["access_token"], renewed_data["client_id"]
             else:
-                print("[TokenManager] ❌ Token renewal failed. Re-checking file in case of external update...")
-                # Maybe another process updated it?
-                time.sleep(1)
-                token_data = self.load_token()
-                if token_data and not self.is_token_expired(token_data, buffer_seconds=60):
-                     print("[TokenManager] ✅ Found valid token on disk after renewal failure.")
-                     self.last_loaded_token = token_data["access_token"]
-                     return token_data["access_token"], token_data["client_id"]
-                
-                print("[TokenManager] ❌ Please regenerate token manually in Dhan Dashboard and update dhan_token.json")
+                print("[TokenManager] ❌ Token renewal failed. Please regenerate token manually.")
                 return None, None
 
         self.last_loaded_token = access_token

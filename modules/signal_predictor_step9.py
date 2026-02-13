@@ -6,6 +6,11 @@ Runs after Step 5 (Feature Builder) to generate ML-based trading signals.
 
 import json
 import os
+import sys
+
+# Add parent directory to path to allow importing config
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import joblib
 import numpy as np
 from datetime import datetime, timezone, timedelta
@@ -397,8 +402,37 @@ def run_signal_predictor(signals_new_path=None, signals_all_path=None):
     for feature_row in combined_features:
         article_id = str(feature_row.get("article_id"))
         
+        # Strict Feature Validation (No Silent Defaults)
+        # Ensure all feature columns exist and are numeric
+        feature_values = []
+        missing_cols = []
+        is_valid = True
+        
+        for col in FEATURE_COLUMNS:
+            val = feature_row.get(col)
+            if val is None:
+                missing_cols.append(col)
+                is_valid = False
+            else:
+                try:
+                    # Check if numeric
+                    float_val = float(val)
+                    if np.isnan(float_val) or np.isinf(float_val):
+                        missing_cols.append(f"{col}({val})")
+                        is_valid = False
+                    else:
+                        feature_values.append(float_val)
+                except (ValueError, TypeError):
+                    missing_cols.append(f"{col}({val})")
+                    is_valid = False
+        
+        if not is_valid:
+            # Skip row if features are invalid/missing
+            # log(f"⚠️ Skipping article {article_id}: Missing/Invalid features: {missing_cols}")
+            continue
+
         # Extract feature vector
-        X = np.array([[feature_row.get(col, 0.0) for col in FEATURE_COLUMNS]])
+        X = np.array([feature_values])
         
         # Predict
         try:
@@ -409,20 +443,19 @@ def run_signal_predictor(signals_new_path=None, signals_all_path=None):
             sell_prob = float(pred_proba[1])
             hold_prob = float(pred_proba[2])
             
-            # Threshold-based decision (fixes HOLD bias)
-            # BUY/SELL need 25% confidence AND must beat the competing signal
-            # Lowered from 35% because model probabilities are inherently low
-            BUY_SELL_THRESHOLD = 0.25
+            # Pure Argmax with Low-Confidence Filter
+            max_prob_idx = np.argmax(pred_proba)
+            max_prob = float(pred_proba[max_prob_idx])
             
-            if buy_prob >= BUY_SELL_THRESHOLD and buy_prob > sell_prob:
-                predicted_signal = "BUY"
-                signal_confidence = buy_prob
-            elif sell_prob >= BUY_SELL_THRESHOLD and sell_prob > buy_prob:
-                predicted_signal = "SELL"
-                signal_confidence = sell_prob
-            else:
+            # Map index to label
+            # LABEL_MAP = {0: "BUY", 1: "SELL", 2: "HOLD"}
+            predicted_signal = LABEL_MAP[max_prob_idx]
+            signal_confidence = max_prob
+            
+            # Low-confidence Filter: If model is unsure (< 40%), force HOLD
+            if max_prob < 0.40:
                 predicted_signal = "HOLD"
-                signal_confidence = hold_prob
+                # log(f"⚠️ Low confidence ({max_prob:.2f}) for article {article_id}. Forcing HOLD.")
             
             # Get original article metadata (from sentiment step)
             original_article = sentiment_map.get(article_id, sentiment_all_map.get(article_id, {}))

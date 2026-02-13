@@ -264,18 +264,37 @@ def train_on_historic_data(processed_articles):
     
     # Configure device
     device_params = {}
-    import torch
-    if torch.cuda.is_available():
-        log_historic("🚀 Training on GPU")
-        device_params = {
-            "tree_method": "hist",
-            "device": "cuda"
-        }
-    else:
-        log_historic("💻 Training on CPU")
+    try:
+        import torch
+        if torch.cuda.is_available():
+            log_historic("🚀 Training on GPU")
+            device_params = {
+                "tree_method": "hist",
+                "device": "cuda"
+            }
+        else:
+            log_historic("💻 Training on CPU (GPU available but not used)")
+            device_params = {
+                "n_jobs": -1
+            }
+    except ImportError:
+        log_historic("💻 Training on CPU (Torch not found)")
         device_params = {
             "n_jobs": -1
         }
+
+    # Calculate sample weights to handle class imbalance (HOLD bias)
+    from sklearn.utils.class_weight import compute_sample_weight
+    sample_weights = compute_sample_weight(
+        class_weight='balanced',
+        y=y_train
+    )
+    
+    # Boost BUY/SELL weights slightly more to be aggressive
+    buy_idx = np.where(y_train == LABEL_MAP["BUY"])[0]
+    sell_idx = np.where(y_train == LABEL_MAP["SELL"])[0]
+    sample_weights[buy_idx] *= 1.5
+    sample_weights[sell_idx] *= 1.5
 
     # Train model
     log_historic("Training XGBoost classifier...")
@@ -292,7 +311,7 @@ def train_on_historic_data(processed_articles):
         **device_params
     )
     
-    model.fit(X_train, y_train)
+    model.fit(X_train, y_train, sample_weight=sample_weights)
     
     # Evaluate
     preds = model.predict(X_val)

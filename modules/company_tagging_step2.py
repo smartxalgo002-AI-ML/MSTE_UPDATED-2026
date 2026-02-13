@@ -21,6 +21,16 @@ GENERIC_KEYWORDS = {
     "retail", "fashion", "trade", "export", "import", "growth", "value", "focus", "dollar", "rain", "wealth",
 }
 
+# Negative context keywords: If these words appear, do NOT tag the company
+# This prevents "Campus Activewear" from being tagged in news about "Hansraj College Campus"
+NEGATIVE_CONTEXT_KEYWORDS = {
+    "campus": [
+        "college", "university", "school", "student", "education", "principal", 
+        "wedding", "protest", "politics", "abvp", "sfi", "exam", "semester", 
+        "faculty", "admission", "hostel", "canteen"
+    ]
+}
+
 # Exclusion patterns: parent keyword -> subsidiary suffixes (skip parent if subsidiary follows)
 KEYWORD_EXCLUSIONS = {
     "tiger": ["global", "brands"],
@@ -117,6 +127,19 @@ def tag_and_save_articles():
                 return True
         return False
 
+        return False
+
+    def has_negative_context(keyword: str, text: str) -> bool:
+        """Check if text contains negative context words for this keyword."""
+        keyword_lower = keyword.lower()
+        if keyword_lower in NEGATIVE_CONTEXT_KEYWORDS:
+            text_lower = text.lower()
+            # aggressive check: any of the negative words present?
+            for neg_word in NEGATIVE_CONTEXT_KEYWORDS[keyword_lower]:
+                if f" {neg_word} " in f" {text_lower} ":  # basic word boundary check
+                    return True
+        return False
+
     def has_business_action(text: str) -> bool:
         """Check if text contains business/financial action keywords."""
         text_lower = text.lower()
@@ -181,6 +204,10 @@ def tag_and_save_articles():
             # Skip if excluded by context (e.g., "reliance retail" shouldn't match "reliance")
             if is_excluded_by_context(kw, text):
                 continue
+                
+            # Skip if negative context is present (e.g., "college campus" shouldn't match "Campus")
+            if has_negative_context(kw, full_text):
+                continue
             
             # Skip generic keywords unless they're part of a longer match
             if is_generic_keyword(kw):
@@ -189,9 +216,9 @@ def tag_and_save_articles():
             # CONFIDENCE SCORING: Need at least 2 of these conditions
             confidence_signals = 0
             
-            # Signal 1: Full company name or clear alias
+            # Signal 1: Full company name or clear alias (weight 2 — passes threshold alone)
             if is_full_company_name(kw, company_info["CompanyName"]):
-                confidence_signals += 1
+                confidence_signals += 2
             
             # Signal 2: Business/financial action in headline
             if has_business_action(headline):
@@ -203,7 +230,7 @@ def tag_and_save_articles():
             
             # Signal 4: Stock symbol match (very reliable)
             if kw.upper() == symbol:
-                confidence_signals += 2  # Double weight for exact symbol match
+                confidence_signals += 3  # Triple weight for exact symbol match
             
             # Require at least 2 confidence signals
             if confidence_signals < 2:

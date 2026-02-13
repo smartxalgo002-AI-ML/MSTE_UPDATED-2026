@@ -60,52 +60,52 @@ def log(msg: str):
 # HELPERS
 # ==================================================
 
-def map_sentiment_to_score(sentiment, confidence):
-    sentiment = sentiment.lower()
-    if sentiment == "positive":
-        return round(confidence, 4)
-    elif sentiment == "negative":
-        return round(-confidence, 4)
-    else:
-        return 0.0
-
-
 def parse_published_time(published_time):
     """Parse various published_time formats to datetime.
     
-    Converts IST timestamps to UTC by subtracting 5h 30m.
+    Article timestamps are in IST - properly converts to UTC.
     Returns timezone-aware datetime in UTC.
     """
     if not published_time:
         return None
     
     try:
-        # Format: "05:16 PM | 17 Jan 2026"
+        # Format: "10:49:00 AM | 13 Feb 2026" (IST)
         if "|" in published_time:
             time_part, date_part = published_time.split("|")
             time_part = time_part.strip()
             date_part = date_part.strip()
             dt_str = f"{date_part} {time_part}"
-            dt = datetime.strptime(dt_str, "%d %b %Y %I:%M %p")
-            return dt.replace(tzinfo=timezone.utc)
+            
+            # Handle with/without seconds in time format
+            fmt = "%d %b %Y %I:%M %p"
+            if len(time_part.split(":")) == 3:  # Has seconds: "10:49:00 AM"
+                fmt = "%d %b %Y %I:%M:%S %p"
+            
+            dt = datetime.strptime(dt_str, fmt)
+            # Properly assign IST timezone and convert to UTC
+            dt_ist = dt.replace(tzinfo=timezone(timedelta(hours=5, minutes=30)))
+            return dt_ist.astimezone(timezone.utc)
         
         # Format: "January 17, 2026/ 14:47 IST"
         if "/" in published_time and "IST" in published_time:
             dt_str = published_time.replace(" IST", "").replace("/", "")
             dt = datetime.strptime(dt_str.strip(), "%B %d, %Y %H:%M")
-            # Convert IST to UTC by subtracting 5 hours 30 minutes
-            dt_utc = dt - timedelta(hours=5, minutes=30)
-            return dt_utc.replace(tzinfo=timezone.utc)
+            # Properly assign IST timezone and convert to UTC
+            dt_ist = dt.replace(tzinfo=timezone(timedelta(hours=5, minutes=30)))
+            return dt_ist.astimezone(timezone.utc)
         
-        # Format: "2026-01-17 17:25:29"
+        # Format: "2026-01-17 17:25:29" (assume IST)
         if "-" in published_time and ":" in published_time:
             dt = datetime.strptime(published_time[:19], "%Y-%m-%d %H:%M:%S")
-            return dt.replace(tzinfo=timezone.utc)
+            dt_ist = dt.replace(tzinfo=timezone(timedelta(hours=5, minutes=30)))
+            return dt_ist.astimezone(timezone.utc)
         
-        # Format: "January 17, 2026 at 02:44 PM"
+        # Format: "January 17, 2026 at 02:44 PM" (assume IST)
         if " at " in published_time:
             dt = datetime.strptime(published_time, "%B %d, %Y at %I:%M %p")
-            return dt.replace(tzinfo=timezone.utc)
+            dt_ist = dt.replace(tzinfo=timezone(timedelta(hours=5, minutes=30)))
+            return dt_ist.astimezone(timezone.utc)
         
     except Exception as e:
         log(f"Could not parse time '{published_time}': {e}")
@@ -177,7 +177,23 @@ def time_decay_15m(published_time):
 def company_mention_strength(text, company):
     if not company:
         return 0
-    return text.lower().count(company.lower())
+    
+    # Extract meaningful keywords from company name (ignore common suffixes)
+    # This handles cases like "Hindustan Aeronautics Limited" vs "Hindustan Aeronautics"
+    stop_words = {'limited', 'ltd', 'ltd.', 'inc', 'corp', 'corporation', 'company', 'co'}
+    words = [w.strip() for w in company.lower().split() if len(w.strip()) > 2]
+    keywords = [w for w in words if w not in stop_words]
+    
+    if not keywords:
+        # If only stop words, use full name
+        return text.lower().count(company.lower())
+    
+    # Count mentions of any keyword
+    total_count = 0
+    for keyword in keywords:
+        total_count += text.lower().count(keyword)
+    
+    return total_count
 
 
 def is_regulatory_news(text):
@@ -202,27 +218,38 @@ def sanitize_for_filename(name: str) -> str:
 def load_ohlcv_for_features(company_name, news_date):
     """
     Load 1-min OHLCV CSV for a company on a specific date.
+    Handles weekends/holidays by searching backwards up to 5 days.
     Returns pandas DataFrame or None if file doesn't exist.
     """
     if not company_name or not news_date:
         return None
         
     sanitized_name = sanitize_for_filename(company_name)
-    date_str = news_date.strftime("%d-%m-%Y")
     
-    company_dir = os.path.join(OHLCV_DIR, sanitized_name)
-    file_path = os.path.join(company_dir, f"{sanitized_name} {date_str}.csv")
+    # Try the news date first
+    current_date = news_date if isinstance(news_date, datetime) else news_date
+    if not isinstance(current_date, datetime):
+        current_date = datetime.combine(news_date, datetime.min.time())
     
-    if not os.path.exists(file_path):
-        return None
+    # Look back up to 5 days for available data (handles weekends/holidays)
+    for lookback_days in range(6):  # 0 to 5 days back
+        check_date = current_date - timedelta(days=lookback_days)
+        date_str = check_date.strftime("%d-%m-%Y")
+        
+        company_dir = os.path.join(OHLCV_DIR, sanitized_name)
+        file_path = os.path.join(company_dir, f"{sanitized_name} {date_str}.csv")
+        
+        if os.path.exists(file_path):
+            try:
+                df = pd.read_csv(file_path)
+                df["timestamp"] = pd.to_datetime(df["timestamp"])
+                return df.sort_values("timestamp")
+            except Exception as e:
+                log(f"Error loading OHLCV for {company_name} on {date_str}: {e}")
+                continue
     
-    try:
-        df = pd.read_csv(file_path)
-        df["timestamp"] = pd.to_datetime(df["timestamp"])
-        return df.sort_values("timestamp")
-    except Exception as e:
-        log(f"Error loading OHLCV for {company_name}: {e}")
-        return None
+    # No data found in last 5 days
+    return None
 
 
 def calculate_market_features(company_name, news_time):
@@ -245,9 +272,13 @@ def calculate_market_features(company_name, news_time):
     if ohlcv_df is None or len(ohlcv_df) == 0:
         return None
     
-    # Convert timezone-aware datetime to naive for pandas comparison
+    # Critical: OHLCV timestamps are stored in IST (naive)
+    # news_time comes from parse_published_time() as UTC
+    # We need to convert UTC → IST, then make naive for comparison
     if news_time.tzinfo is not None:
-        news_time = news_time.replace(tzinfo=None)
+        # Convert UTC to IST (UTC + 5:30)
+        news_time_ist = news_time + timedelta(hours=5, minutes=30)
+        news_time = news_time_ist.replace(tzinfo=None)
     
     # Get data BEFORE news (critical: no future leakage!)
     pre_news_df = ohlcv_df[ohlcv_df['timestamp'] < news_time]
@@ -309,9 +340,14 @@ def build_feature_row(news):
     if "sentiment" not in news or "confidence" not in news:
         return None
 
-    sentiment_score = map_sentiment_to_score(
-        news["sentiment"], news["confidence"]
-    )
+    # Compute sentiment_score as positive_prob - negative_prob
+    positive_prob = news.get("positive_prob")
+    negative_prob = news.get("negative_prob")
+    
+    if positive_prob is not None and negative_prob is not None:
+        sentiment_score = round(positive_prob - negative_prob, 4)
+    else:
+        sentiment_score = 0.0
 
     text_blob = (news.get("headline", "") + " " + news.get("condensed_text", "")).lower()
     
@@ -332,10 +368,10 @@ def build_feature_row(news):
         "sentiment_score": sentiment_score,
         "confidence": news["confidence"],
         
-        # Sentiment probabilities from DeBERTa
-        "positive_prob": news.get("positive_prob", 0.0),
-        "negative_prob": news.get("negative_prob", 0.0),
-        "neutral_prob": news.get("neutral_prob", 0.0),
+        # Sentiment probabilities from DeBERTa (preserve valid 0.0 values)
+        "positive_prob": news["positive_prob"] if news.get("positive_prob") is not None else 0.0,
+        "negative_prob": news["negative_prob"] if news.get("negative_prob") is not None else 0.0,
+        "neutral_prob": news["neutral_prob"] if news.get("neutral_prob") is not None else 0.0,
 
         "news_source_score": SOURCE_SCORE.get(
             news.get("source", ""), 0.7
@@ -352,12 +388,12 @@ def build_feature_row(news):
             news.get("published_time", "")
         ),
         
-        # Market features (prioritize existing data, then calculation, else None)
-        "pre_news_momentum_5m": news.get("pre_news_momentum_5m") or (market_features.get('pre_news_momentum_5m') if market_features else None),
-        "pre_news_momentum_30m": news.get("pre_news_momentum_30m") or (market_features.get('pre_news_momentum_30m') if market_features else None),
-        "pre_news_volume_ratio": news.get("pre_news_volume_ratio") or (market_features.get('pre_news_volume_ratio') if market_features else None),
-        "intraday_volatility": news.get("intraday_volatility") or (market_features.get('intraday_volatility') if market_features else None),
-        "pre_news_price": news.get("pre_news_price") or (market_features.get('pre_news_price') if market_features else None),
+        # Market features (use explicit None checks to preserve valid 0.0 values)
+        "pre_news_momentum_5m": news["pre_news_momentum_5m"] if news.get("pre_news_momentum_5m") is not None else (market_features.get('pre_news_momentum_5m') if market_features else None),
+        "pre_news_momentum_30m": news["pre_news_momentum_30m"] if news.get("pre_news_momentum_30m") is not None else (market_features.get('pre_news_momentum_30m') if market_features else None),
+        "pre_news_volume_ratio": news["pre_news_volume_ratio"] if news.get("pre_news_volume_ratio") is not None else (market_features.get('pre_news_volume_ratio') if market_features else None),
+        "intraday_volatility": news["intraday_volatility"] if news.get("intraday_volatility") is not None else (market_features.get('intraday_volatility') if market_features else None),
+        "pre_news_price": news["pre_news_price"] if news.get("pre_news_price") is not None else (market_features.get('pre_news_price') if market_features else None),
         
         "published_time": news.get("published_time"),
         "source": news.get("source"),
