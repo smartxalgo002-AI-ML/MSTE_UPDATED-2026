@@ -17,6 +17,12 @@ This project automatically:
 
 ---
 
+## 🔗 GitHub Repository
+**URL**: [https://github.com/smartxalgo002-AI-ML/MSTE_UPDTAED-2026](https://github.com/smartxalgo002-AI-ML/MSTE_UPDTAED-2026)
+
+---
+
+
 ## Pipeline Steps (How It Works)
 
 ### Step 1: News Fetcher
@@ -60,15 +66,24 @@ This project automatically:
 - Uses rule-based thresholds on 15-minute returns
 - Generates training data for ML model
 
-### Step 8: XGBoost Self-Training
-- Trains machine learning model on labeled historical data
-- Requires 300+ samples to retrain
-- Automatically improves over time with more data
+### Step 8: XGBoost Model Training
+- **Current Model**: `historic_v1` (Trained Feb 2026)
+- **Features**: 73 numerical features including granular lookbacks (1min, 5min, 15min) and sentiment scores.
+- **Bias Correction**: Uses **Weighted Loss** to penalize HOLD errors, achieving balanced recall across BUY/SELL/HOLD (~62% accuracy).
+- **Training Data**: 1700+ historic files (~16k labeled samples).
 
 ### Step 9: Signal Predictor
 - **Daylight Mode**: Uses trained XGBoost model with live market data for BUY/SELL/HOLD.
 - **Overnight Mode**: Buffers incoming news in `overnight_buffer.json` and shows sentiment bias (BULLISH/BEARISH/NEUTRAL) on the dashboard via `overnight_signal.json`.
 - **9:30 AM Trigger**: Automatically combines overnight news with fresh market ticks for real predictions at open.
+
+---
+
+## ✅ Recent Improvements (v2026)
+1. **Weighted Loss Training**: Solved "Hold Bias" by applying 1.5x weight to Buy/Sell signals.
+2. **Granular Market Features**: Now generates `open_1min`, `volatility_5min`, etc. for precise ML input.
+3. **Timezone Fixes**: Corrected UTC-IST conversion bugs in `ohlcv_merge_step6.py` to ensure feature alignment.
+4. **Enhanced Company Tagging**: Partial name matching (e.g., "Infosys" without "Limited") now supported.
 
 ---
 
