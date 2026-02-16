@@ -12,6 +12,14 @@ import numpy as np
 from collections import deque
 from token_manager import TokenManager
 
+# Alert system for monitoring
+try:
+    from alerts import log_alert
+except ImportError:
+    def log_alert(msg):
+        print(f"[ALERT] {msg}")
+
+
 # =========================
 # CONFIGURATION
 # =========================
@@ -60,9 +68,47 @@ def update_global_token():
     WS_URL = f"wss://api-feed.dhan.co?version=2&token={ACCESS_TOKEN}&clientId={CLIENT_ID}&authType=2"
     return True
 
-# Initial token load
+# Initial token load (non-fatal if renewal fails on weekends)
 if not update_global_token():
-     raise RuntimeError("❌ Failed to load valid token. Please check dhan_token.json")
+    print("⚠️  Warning: Token validation failed. Will retry before market hours.")
+    ACCESS_TOKEN, CLIENT_ID = "PLACEHOLDER", "PLACEHOLDER"  # Temporary to avoid crash
+    WS_URL = "wss://placeholder"
+
+# NSE/BSE trading day detection
+def is_trading_day():
+    """Check if today is a trading day (Mon-Fri, excluding holidays)"""
+    from datetime import datetime
+    import pytz
+    
+    ist = pytz.timezone('Asia/Kolkata')
+    now_ist = datetime.now(ist)
+    
+    # Check if weekend (Saturday=5, Sunday=6)
+    weekday = now_ist.weekday()
+    if weekday >= 5:  # Saturday or Sunday
+        return False, f"Weekend ({now_ist.strftime('%A')})"
+    
+    # Check for known NSE holidays (2026 - add more as needed)
+    holidays_2026 = [
+        "2026-01-26",  # Republic Day
+        "2026-03-14",  # Holi
+        "2026-04-02",  # Ram Navami  
+        "2026-04-10",  # Mahavir Jayanti
+        "2026-04-14",  # Dr. Ambedkar Jayanti
+        "2026-05-01",  # Maharashtra Day
+        "2026-08-15",  # Independence Day
+        "2026-10-02",  # Gandhi Jayanti
+        "2026-10-24",  # Dussehra
+        "2026-11-13",  # Diwali
+        "2026-11-14",  # Diwali (Balipratipada)
+        "2026-12-25",  # Christmas
+    ]
+    
+    today_str = now_ist.strftime("%Y-%m-%d")
+    if today_str in holidays_2026:
+        return False, f"NSE Holiday ({today_str})"
+    
+    return True, "Trading Day"
 
 
 print(f"[Config] Using Client ID: {CLIENT_ID}")
@@ -183,6 +229,7 @@ lock = threading.Lock()
 candles = {}  # {(company, minute_timestamp): candle_dict}
 closed_candles = []  # Queue of candles to write (populated by closer thread)
 stop_flag = False  # Signal to stop all threads
+closed_minutes = set() # (company, minute_timestamp) - Permanently closed
 
 # Maintain last N closes for HV calculation
 last_n_closes = {company: deque(maxlen=HV_WINDOW) for company in SECID_TO_COMPANY.values()}
@@ -235,7 +282,11 @@ def process_tick(secid: str, ltp: float, ltq: int, ltt: int):
     minute_start = ts.replace(second=0, microsecond=0)
     company = SECID_TO_COMPANY.get(secid, secid)
     
-    # Reject ticks outside grace window
+    # 1. Reject ticks for already closed minutes (Global Tracker)
+    if (company, minute_start) in closed_minutes:
+        return # Silent rejection for late ticks
+
+    # 2. Reject ticks outside grace window
     if not is_tick_acceptable(ts, now_ist):
         if PRINT_TICKS:
             print(f"[REJECT] {company} tick at {ts.strftime('%H:%M:%S')} is too old (now: {now_ist.strftime('%H:%M:%S')})")
@@ -303,6 +354,10 @@ def candle_closer_loop():
                 for key in keys_to_close:
                     candle = candles.pop(key)
                     closed_candles.append(candle)
+                    
+                    # Mark this minute as closed for this company
+                    company = candle["company"]
+                    closed_minutes.add((company, minute_to_close))
             
             # Brief sleep to avoid double-trigger
             time.sleep(0.6)
@@ -535,29 +590,80 @@ class DhanClient:
 # MAIN
 # =========================
 def sleep_until_next_market_open():
-    """Sleep until 09:10 AM IST next trading day"""
+    """Sleep until 09:00 AM IST of the NEXT TRADING DAY"""
     now_ist = datetime.now(IST)
     
-    # Target: Today 09:00 AM
+    # Start with TARGET = Today 09:00 AM
     target = now_ist.replace(hour=9, minute=0, second=0, microsecond=0)
     
-    # If already past 09:00, target tomorrow 09:00
+    # If today is already past 09:00 AM, move to Tomorrow
     if now_ist > target:
         target += timedelta(days=1)
-
+    
+    # KEY FIX: Keep adding days until we find a Valid Trading Day
+    # We use a temporary helper to check future dates
+    def check_date_is_trading(date_obj):
+        # We need to replicate is_trading_day logic for a specific date
+        # (Since is_trading_day() uses datetime.now(), we need a custom check here
+        #  or we can mock datetime, but simpler to just re-implement check for date)
         
-    # Example logic for weekends could be added here if needed
-    # For now, just simplistic next-day logic
-    
+        # 1. Weekend Check (0=Mon, 6=Sun)
+        if date_obj.weekday() >= 5: # Sat or Sun
+            return False, "Weekend"
+            
+        # 2. Holiday Check
+        holidays_2026 = [
+            "2026-01-26", "2026-03-14", "2026-04-02", "2026-04-10",
+            "2026-04-14", "2026-05-01", "2026-08-15", "2026-10-02",
+            "2026-10-24", "2026-11-13", "2026-11-14", "2026-12-25"
+        ]
+        date_str = date_obj.strftime("%Y-%m-%d")
+        if date_str in holidays_2026:
+            return False, "Holiday"
+            
+        return True, "Trading Day"
+
+    # Loop until we find a trading day
+    while True:
+        is_trading, reason = check_date_is_trading(target)
+        if is_trading:
+            break
+        print(f"[System] Skipping {target.strftime('%Y-%m-%d')} ({reason})...")
+        target += timedelta(days=1)
+        
     wait_seconds = (target - now_ist).total_seconds()
-    hours = wait_seconds / 3600
-    print(f"[System] Sleeping for {hours:.2f} hours until {target.strftime('%Y-%m-%d %H:%M:%S')} IST...")
+    print(f"[System] Sleeping until {target.strftime('%Y-%m-%d %H:%M:%S')} IST...")
+    print(f"[System] Will wake up every 6 hours to maintain token validity.")
     
-    # Sleep in chunks to allow CTRL+C
+    # Sleep in 6-hour chunks to maintain token
+    MAINTENANCE_INTERVAL = 6 * 3600  # 6 hours
+    
     while wait_seconds > 0:
-        chunk = min(wait_seconds, 60)
-        time.sleep(chunk)
-        wait_seconds -= chunk
+        # Determine next sleep duration
+        next_sleep = min(wait_seconds, MAINTENANCE_INTERVAL)
+        
+        # Sleep for this duration (in 1-minute chunks for CTRL+C)
+        remaining_chunk = next_sleep
+        while remaining_chunk > 0:
+            sub_chunk = min(remaining_chunk, 60)
+            time.sleep(sub_chunk)
+            remaining_chunk -= sub_chunk
+            
+        wait_seconds -= next_sleep
+        
+        # Wake up to check token (only if we still have time left)
+        if wait_seconds > 300:  # If more than 5 mins remaining
+            print(f"[System] Maintenance Wake-up: Checking token validity...")
+            try:
+                # Update global token manager
+                token_valid = update_global_token()
+                if token_valid:
+                    print(f"[System] ✅ Token maintained successfully. Resuming sleep...")
+                else:
+                    print(f"[System] ⚠️ Token update failed during sleep. Will retry next cycle.")
+            except Exception as e:
+                print(f"[System] ⚠️ Error maintaining token: {e}")
+
         
 def run_daily_session():
     """Run one daily session from now until market close"""
@@ -714,34 +820,61 @@ def run_daily_session():
 # MAIN LOOP (Runs Forever)
 # =========================
 if __name__ == "__main__":
+    # Start background token renewal daemon for production continuous operation
+    print("\n" + "="*60)
+    print("🚀 STARTING BACKGROUND TOKEN RENEWAL DAEMON")
+    print("="*60)
+    token_manager.start_renewal_daemon(
+        check_interval_seconds=3600,  # Check every hour
+        alert_callback=log_alert       # Alert on failures
+    )
+    print("✅ Daemon will check token validity every hour")
+    print("="*60 + "\n")
+    
     try:
         while True:
-            # 1. Update Token (Auto-Renew if needed) before session starts
-            print("\n[System] Checking Token Validity...")
-            ACCESS_TOKEN, CLIENT_ID = token_manager.get_valid_token()
+            # 0. Check if today is a trading day
+            is_trading, status_msg = is_trading_day()
             
-            if not ACCESS_TOKEN:
-                print("[System] ❌ Failed to get valid token. Retrying in 60s...")
-                time.sleep(60)
-                continue
+            if not is_trading:
+                print("\n" + "="*60)
+                print(f"🛑 MARKET OFF: {status_msg}")
+                print("="*60)
+                print("📺 News pipeline will continue running in background...")
+                print("💤 OHLCV data collection paused until next trading day")
+                print("="*60 + "\n")
                 
-            # Update global variables so run_daily_session uses the new token/client
-            WS_URL = f"wss://api-feed.dhan.co?version=2&token={ACCESS_TOKEN}&clientId={CLIENT_ID}&authType=2"
+                # Sleep until next potential trading day (Monday 9 AM or next day)
+                sleep_until_next_market_open()
+                print("⏰ Waking up to check if market is open...\n")
+                continue  # Re-check trading status
+            
+            # 1. Update Token (Auto-Renew if needed) before session starts
+            print("\n[System] ✅ Trading Day Confirmed")
+            print("[System] Checking Token Validity...")
+            
+            # Retry token validation
+            token_valid = update_global_token()
+            if not token_valid:
+                ACCESS_TOKEN_RETRY, CLIENT_ID_RETRY = token_manager.get_valid_token()
+                if ACCESS_TOKEN_RETRY and CLIENT_ID_RETRY:
+                    ACCESS_TOKEN, CLIENT_ID = ACCESS_TOKEN_RETRY, CLIENT_ID_RETRY
+                    WS_URL = f"wss://api-feed.dhan.co?version=2&token={ACCESS_TOKEN}&clientId={CLIENT_ID}&authType=2"
+                else:
+                    print("[System] ❌ Failed to get valid token. Retrying in 5 minutes...")
+                    time.sleep(300)  # Wait 5 mins before retry
+                    continue
             
             # 2. Run the daily trading session
             run_daily_session()
             
-            # 2. After session ends (at 15:31), go to sleep until next morning
+            # 3. After session ends (at 15:31), go to sleep until next morning
             print("\n" + "="*60)
             print("MARKET CLOSED FOR TODAY")
             print("System will now sleep until next market open (09:00 AM IST)")
             print("="*60 + "\n")
             
             sleep_until_next_market_open()
-            
-            # 3. Updates token before starting next session (if needed)
-            # TokenManager handles renewal automatically inside get_valid_token logic
-            # but we can force refresh if we wanted to. Current logic re-reads on init.
             print("Waking up! Preparing for new trading session...")
             
     except KeyboardInterrupt:

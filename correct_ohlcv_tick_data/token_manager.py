@@ -184,6 +184,55 @@ class TokenManager:
             
         return changed
 
+    def start_renewal_daemon(self, check_interval_seconds: int = 3600, alert_callback=None):
+        """
+        Start a background daemon thread that periodically checks and renews the token.
+        
+        Args:
+            check_interval_seconds: How often to check token validity (default: 1 hour)
+            alert_callback: Optional function(message) called on renewal failures
+        """
+        import threading
+        
+        def renewal_worker():
+            """Background worker that checks/renews token periodically"""
+            print(f"[TokenManager] 🔄 Renewal daemon started (check every {check_interval_seconds}s)")
+            
+            while True:
+                try:
+                    time.sleep(check_interval_seconds)
+                    
+                    # Check and renew if needed
+                    token, cid = self.get_valid_token()
+                    
+                    if token:
+                        print(f"[TokenManager] ✅ Daemon check: Token is valid")
+                    else:
+                        error_msg = "[TokenManager] ❌ Daemon check: Token renewal FAILED! Manual intervention required."
+                        print(error_msg)
+                        
+                        # Trigger alert if callback provided
+                        if alert_callback:
+                            try:
+                                alert_callback(error_msg)
+                            except Exception as e:
+                                print(f"[TokenManager] Alert callback failed: {e}")
+                                
+                except Exception as e:
+                    print(f"[TokenManager] ⚠️ Daemon error: {e}")
+                    if alert_callback:
+                        try:
+                            alert_callback(f"Token renewal daemon encountered error: {e}")
+                        except:
+                            pass
+        
+        # Start daemon thread
+        daemon_thread = threading.Thread(target=renewal_worker, daemon=True, name="TokenRenewalDaemon")
+        daemon_thread.start()
+        print(f"[TokenManager] ✅ Renewal daemon thread started")
+        
+        return daemon_thread
+
 
 
 if __name__ == "__main__":
